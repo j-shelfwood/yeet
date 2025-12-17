@@ -87,7 +87,7 @@ public struct FileReader: Sendable {
             )
         }
 
-        // Count tokens
+        // Count tokens with fast heuristic
         let tokenCount = Tokenizer.estimateTokens(for: content)
 
         // Truncate if necessary
@@ -100,10 +100,7 @@ public struct FileReader: Sendable {
                 wasTruncated: false
             )
         } else {
-            let truncated = TruncationStrategy.truncateHeadTail(
-                content,
-                limit: tokenLimit
-            )
+            let truncated = TruncationStrategy.truncateHeadTail(content, limit: tokenLimit)
             let truncatedTokenCount = Tokenizer.estimateTokens(for: truncated)
 
             return FileContent(

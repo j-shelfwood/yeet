@@ -11,6 +11,7 @@ public struct TruncationStrategy {
     /// - Parameters:
     ///   - content: Original file content
     ///   - limit: Maximum token count
+    ///   - tokenizer: Tokenizer instance for accurate token counting
     /// - Returns: Truncated content with marker
     ///
     /// ## Strategy
@@ -76,6 +77,7 @@ public struct TruncationStrategy {
     /// - Parameters:
     ///   - content: Original file content
     ///   - limit: Maximum token count
+    ///   - tokenizer: Tokenizer instance for accurate token counting
     /// - Returns: Truncated content
     public static func truncateHeadOnly(_ content: String, limit: Int) -> String {
         let lines = content.components(separatedBy: .newlines)

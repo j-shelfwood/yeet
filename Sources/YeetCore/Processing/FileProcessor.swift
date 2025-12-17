@@ -67,37 +67,4 @@ public actor FileProcessor {
 
         return fileContents
     }
-
-    /// Process files sequentially (for compatibility)
-    ///
-    /// - Parameter fileURLs: Array of file URLs to process
-    /// - Returns: Array of processed file contents
-    /// - Throws: YeetError if safety limits exceeded
-    nonisolated public func processFilesSequential(_ fileURLs: [URL]) throws -> [FileContent] {
-        var fileContents: [FileContent] = []
-        var totalTokens = 0
-
-        for url in fileURLs {
-            do {
-                let content = try reader.readFile(at: url)
-                fileContents.append(content)
-                totalTokens += content.tokenCount
-
-                // Check total token limit
-                if totalTokens > safetyLimits.maxTotalTokens {
-                    throw YeetError.tooManyTokens(
-                        total: totalTokens,
-                        limit: safetyLimits.maxTotalTokens
-                    )
-                }
-            } catch let error as YeetError {
-                throw error
-            } catch {
-                // Log and continue
-                continue
-            }
-        }
-
-        return fileContents
-    }
 }

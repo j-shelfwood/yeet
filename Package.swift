@@ -30,10 +30,6 @@ let package = Package(
         .target(
             name: "YeetCore",
             dependencies: []
-            // TODO: Add tokenizer resource file
-            // resources: [
-            //     .copy("Resources/cl100k_base.tiktoken")
-            // ]
         ),
 
         // Tests
