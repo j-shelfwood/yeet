@@ -45,10 +45,46 @@ public struct FileReader: Sendable {
             )
         }
 
-        // Read file content
-        guard let data = try? Data(contentsOf: url),
-              let content = String(data: data, encoding: .utf8) else {
+        // Read file content with binary detection
+        // OPTIMIZATION: Peek first 1KB to detect binary files before loading entire file
+        let handle: FileHandle
+        do {
+            handle = try FileHandle(forReadingFrom: url)
+        } catch {
             throw YeetError.fileReadError(url.path)
+        }
+        defer { try? handle.close() }
+
+        // Read first 1KB (or less for small files) to check for binary content
+        guard let preamble = try? handle.read(upToCount: 1024) else {
+            throw YeetError.fileReadError(url.path)
+        }
+
+        // Binary detection: Check for null bytes (0x00)
+        // Binary files typically contain null bytes, text files do not
+        if preamble.contains(0) {
+            return FileContent(
+                path: url.path,
+                content: "[SKIPPED - Binary file detected]",
+                tokenCount: 0,
+                originalTokenCount: 0,
+                wasTruncated: false
+            )
+        }
+
+        // Read the rest of the file
+        let rest = (try? handle.readToEnd()) ?? Data()
+        let fullData = preamble + rest
+
+        // Try to decode as UTF-8
+        guard let content = String(data: fullData, encoding: .utf8) else {
+            return FileContent(
+                path: url.path,
+                content: "[SKIPPED - Invalid UTF-8 encoding]",
+                tokenCount: 0,
+                originalTokenCount: 0,
+                wasTruncated: false
+            )
         }
 
         // Count tokens
