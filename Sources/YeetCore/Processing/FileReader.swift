@@ -1,7 +1,7 @@
 import Foundation
 
 /// Reads and processes file contents
-public struct FileReader {
+public struct FileReader: Sendable {
     private let maxTokens: Int
     private let maxFileSize: Int
 
@@ -64,7 +64,10 @@ public struct FileReader {
                 wasTruncated: false
             )
         } else {
-            let truncated = truncateToTokenLimit(content, limit: tokenLimit)
+            let truncated = TruncationStrategy.truncateHeadTail(
+                content,
+                limit: tokenLimit
+            )
             let truncatedTokenCount = Tokenizer.estimateTokens(for: truncated)
 
             return FileContent(
@@ -75,60 +78,5 @@ public struct FileReader {
                 wasTruncated: true
             )
         }
-    }
-
-    // MARK: - Private Methods
-
-    private func truncateToTokenLimit(_ content: String, limit: Int) -> String {
-        // Estimate lines needed based on token limit
-        // Assuming ~10 tokens per line on average
-        let lines = content.components(separatedBy: .newlines)
-        let estimatedLinesNeeded = (limit * 12) / 10 // Add 20% buffer
-
-        if lines.count <= estimatedLinesNeeded {
-            return content
-        }
-
-        // Take first N lines
-        let truncatedLines = Array(lines.prefix(estimatedLinesNeeded))
-        var truncated = truncatedLines.joined(separator: "\n")
-
-        // Fine-tune by tokens
-        var currentTokens = Tokenizer.estimateTokens(for: truncated)
-
-        if currentTokens > limit {
-            // Remove lines until we're under the limit
-            var lineCount = truncatedLines.count
-            while currentTokens > limit && lineCount > 0 {
-                lineCount -= 1
-                truncated = truncatedLines.prefix(lineCount).joined(separator: "\n")
-                currentTokens = Tokenizer.estimateTokens(for: truncated)
-            }
-        }
-
-        return truncated
-    }
-}
-
-/// Represents the content of a file with token information
-public struct FileContent {
-    public let path: String
-    public let content: String
-    public let tokenCount: Int
-    public let originalTokenCount: Int
-    public let wasTruncated: Bool
-
-    public init(
-        path: String,
-        content: String,
-        tokenCount: Int,
-        originalTokenCount: Int,
-        wasTruncated: Bool
-    ) {
-        self.path = path
-        self.content = content
-        self.tokenCount = tokenCount
-        self.originalTokenCount = originalTokenCount
-        self.wasTruncated = wasTruncated
     }
 }

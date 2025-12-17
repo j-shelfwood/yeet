@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Select Xcode version
+      run: sudo xcode-select -s /Applications/Xcode_15.0.app
+
+    - name: Get version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Build release binary
+      run: swift build -c release
+
+    - name: Create archive
+      run: |
+        cd .build/release
+        tar -czf yeet-${{ steps.get_version.outputs.VERSION }}-macos.tar.gz yeet
+        cd ../..
+
+    - name: Calculate SHA256
+      id: sha256
+      run: |
+        cd .build/release
+        echo "SHA256=$(shasum -a 256 yeet-${{ steps.get_version.outputs.VERSION }}-macos.tar.gz | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+        cd ../..
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: .build/release/yeet-${{ steps.get_version.outputs.VERSION }}-macos.tar.gz
+        body: |
+          ## Installation
+
+          ### Homebrew
+          ```bash
+          brew install shelfwood/tap/yeet
+          ```
+
+          ### Manual
+          ```bash
+          curl -L https://github.com/shelfwood/yeet/releases/download/v${{ steps.get_version.outputs.VERSION }}/yeet-${{ steps.get_version.outputs.VERSION }}-macos.tar.gz | tar xz
+          mv yeet /usr/local/bin/
+          ```
+
+          ## Checksums
+
+          SHA256: `${{ steps.sha256.outputs.SHA256 }}`
+
+          ## What's Changed
+
+          See CHANGELOG.md for details.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update Homebrew Formula
+      run: |
+        echo "Update Formula/yeet.rb with:"
+        echo "  url: https://github.com/shelfwood/yeet/archive/refs/tags/v${{ steps.get_version.outputs.VERSION }}.tar.gz"
+        echo "  sha256: ${{ steps.sha256.outputs.SHA256 }}"

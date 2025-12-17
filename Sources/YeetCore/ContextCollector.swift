@@ -1,25 +1,75 @@
 import Foundation
 
-/// Main context collection orchestrator
+/// Main context collection orchestrator.
+///
+/// `ContextCollector` is the primary interface for gathering source code files,
+/// applying token limits, and formatting output for LLM consumption.
+///
+/// ## Overview
+///
+/// The collector performs the following steps:
+/// 1. **Discovery**: Finds files matching patterns (with optional git-aware discovery)
+/// 2. **Reading**: Reads file contents with safety limits and intelligent truncation
+/// 3. **Git History**: Optionally collects commit history
+/// 4. **Formatting**: Formats output as text or JSON with optional directory tree
+///
+/// ## Usage
+///
+/// ```swift
+/// let config = CollectorConfiguration(
+///     paths: ["Sources"],
+///     maxTokens: 10000,
+///     includeHistory: true
+/// )
+///
+/// let collector = ContextCollector(configuration: config)
+/// let result = try collector.collect()
+///
+/// print("Collected \(result.fileCount) files with \(result.totalTokens) tokens")
+/// try result.copyToClipboard()
+/// ```
+///
+/// ## Error Handling
+///
+/// Throws ``YeetError`` for various failure conditions:
+/// - `tooManyFiles`: Discovered files exceed safety limit
+/// - `fileTooLarge`: Individual file exceeds size limit
+/// - `tooManyTokens`: Total tokens exceed limit
+/// - `gitCommandFailed`: Git operations fail
+///
+/// - SeeAlso: ``CollectorConfiguration``
+/// - SeeAlso: ``CollectionResult``
 public class ContextCollector {
     private let configuration: CollectorConfiguration
     private let discovery: FileDiscovery
-    private let reader: FileReader
+    private let processor: FileProcessor
     private let formatter: OutputFormatter
 
+    /// Creates a new context collector with the specified configuration.
+    ///
+    /// - Parameter configuration: Configuration controlling collection behavior
     public init(configuration: CollectorConfiguration) {
         self.configuration = configuration
         self.discovery = FileDiscovery(configuration: configuration)
-        self.reader = FileReader(
+        self.processor = FileProcessor(
             maxTokens: configuration.maxTokens,
-            maxFileSize: configuration.safetyLimits.maxFileSize
+            safetyLimits: configuration.safetyLimits
         )
         self.formatter = OutputFormatter(configuration: configuration)
     }
 
-    /// Execute the context collection process
-    public func collect() throws -> CollectionResult {
+    /// Executes the context collection process.
+    ///
+    /// Performs file discovery, reads contents in parallel, collects git history (if enabled),
+    /// and formats the output according to configuration settings.
+    ///
+    /// Progress indicators are displayed to stderr unless ``CollectorConfiguration/quiet`` is enabled.
+    ///
+    /// - Returns: A ``CollectionResult`` containing file count, token count, and formatted output
+    /// - Throws: ``YeetError`` if safety limits are exceeded or operations fail
+    public func collect() async throws -> CollectionResult {
         // Step 1: Discover files (handle diff mode if enabled)
+        progress("Discovering files...")
         let fileURLs: [URL]
         if configuration.diffMode {
             fileURLs = try collectDiffFiles()
@@ -36,34 +86,17 @@ public class ContextCollector {
             )
         }
 
-        // Step 2: Read and process files
-        var fileContents: [FileContent] = []
-        var totalTokens = 0
+        progress("Found \(fileURLs.count) files")
 
-        for url in fileURLs {
-            do {
-                let content = try reader.readFile(at: url)
-                fileContents.append(content)
-                totalTokens += content.tokenCount
+        // Step 2: Read and process files in parallel
+        progress("Reading files...")
+        let fileContents = try await processor.processFiles(fileURLs)
+        let totalTokens = fileContents.reduce(0) { $0 + $1.tokenCount }
 
-                // Check total token limit
-                if totalTokens > configuration.safetyLimits.maxTotalTokens {
-                    throw YeetError.tooManyTokens(
-                        total: totalTokens,
-                        limit: configuration.safetyLimits.maxTotalTokens
-                    )
-                }
-            } catch let error as YeetError {
-                // Rethrow YeetError (including limit errors)
-                throw error
-            } catch {
-                // Log other errors but continue processing
-                print("Warning: Failed to read \(url.path): \(error.localizedDescription)")
-            }
-        }
+        progress("Processed \(fileContents.count) files")
 
         // Step 3: Collect git history if enabled
-        var gitHistory: [GitRepository.Commit]? = nil
+        var gitHistory: [Commit]? = nil
         if configuration.includeHistory && !configuration.outputJSON {
             if let gitRepo = GitRepository.find(for: configuration.paths.first ?? ".") {
                 do {
@@ -126,4 +159,16 @@ public class ContextCollector {
     }
 
     private let fileManager = FileManager.default
+
+    // MARK: - Progress Reporting
+
+    /// Print progress message to stderr unless quiet mode is enabled
+    private func progress(_ message: String) {
+        guard !configuration.quiet else { return }
+
+        // Write to stderr so it doesn't interfere with output redirection
+        if let data = (message + "\n").data(using: .utf8) {
+            FileHandle.standardError.write(data)
+        }
+    }
 }

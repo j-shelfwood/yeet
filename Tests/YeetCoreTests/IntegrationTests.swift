@@ -79,19 +79,20 @@ final class IntegrationTests: XCTestCase {
         // Create files that would exceed token limit
         for i in 1...10 {
             let file = tempDir.appendingPathComponent("file\(i).swift")
-            let content = String(repeating: "word ", count: 10000) // ~2500 tokens each
+            // Create ~2500 tokens per file (2500 * 4 chars = 10000 chars)
+            let content = String(repeating: "x", count: 10000) + "\n"
             try content.write(to: file, atomically: true, encoding: .utf8)
         }
 
         let safetyLimits = SafetyLimits(
             maxFiles: 10_000,
             maxFileSize: 100 * 1024 * 1024,
-            maxTotalTokens: 20_000  // Will exceed with 10 files
+            maxTotalTokens: 20_000  // Will exceed with 10 files at ~2500 tokens each
         )
 
         let config = CollectorConfiguration(
             paths: [tempDir.path],
-            maxTokens: 10_000,  // Per-file limit
+            maxTokens: 10_000,  // Per-file limit (files won't hit this)
             safetyLimits: safetyLimits
         )
 

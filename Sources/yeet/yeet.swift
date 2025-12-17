@@ -3,7 +3,7 @@ import YeetCore
 import Foundation
 
 @main
-struct Yeet: ParsableCommand {
+struct Yeet: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "yeet",
         abstract: "AI context aggregator - Package source code for LLM consumption",
@@ -106,6 +106,12 @@ struct Yeet: ParsableCommand {
     )
     var tree: Bool = false
 
+    @Flag(
+        name: .long,
+        help: "Suppress progress indicators"
+    )
+    var quiet: Bool = false
+
     // MARK: - Advanced Options
 
     @Option(
@@ -142,7 +148,7 @@ struct Yeet: ParsableCommand {
 
     // MARK: - Execution
 
-    mutating func run() throws {
+    mutating func run() async throws {
         // Determine final paths
         let finalPaths: [String]
         if let filesFromPath = filesFrom {
@@ -174,6 +180,7 @@ struct Yeet: ParsableCommand {
             outputJSON: json,
             listOnly: listOnly,
             showTree: tree,
+            quiet: quiet,
             rootDirectory: root,
             encodingPath: encodingPath,
             safetyLimits: safetyLimits
@@ -181,7 +188,7 @@ struct Yeet: ParsableCommand {
 
         // Execute collection
         let collector = ContextCollector(configuration: config)
-        let result = try collector.collect()
+        let result = try await collector.collect()
 
         if listOnly {
             print(result.fileList)
