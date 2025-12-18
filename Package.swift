@@ -17,6 +17,18 @@ let package = Package(
         ),
     ],
     targets: [
+        // Rust-backed TiktokenFFI binary framework
+        .binaryTarget(
+            name: "TiktokenFFI",
+            path: "Frameworks/TiktokenFFI.xcframework"
+        ),
+
+        // TiktokenSwift wrapper (local, LFS-free)
+        .target(
+            name: "TiktokenSwift",
+            dependencies: ["TiktokenFFI"]
+        ),
+
         // Executable target (thin CLI wrapper)
         .executableTarget(
             name: "yeet",
@@ -29,7 +41,9 @@ let package = Package(
         // Library target (contains business logic)
         .target(
             name: "YeetCore",
-            dependencies: []
+            dependencies: [
+                "TiktokenSwift",
+            ]
         ),
 
         // Tests

@@ -1,0 +1,4 @@
+# Binary frameworks tracked with Git LFS
+*.xcframework/** filter=lfs diff=lfs merge=lfs -text
+Frameworks/**/*.framework/Versions/*/TiktokenFFI filter=lfs diff=lfs merge=lfs -text
+Frameworks/**/*.framework/TiktokenFFI filter=lfs diff=lfs merge=lfs -text
