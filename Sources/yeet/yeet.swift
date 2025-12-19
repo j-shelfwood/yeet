@@ -10,6 +10,11 @@ struct Yeet: AsyncParsableCommand {
         discussion: """
         Yeet collects source code files, applies intelligent truncation based on token limits,
         and copies the formatted context to your clipboard for use with AI assistants.
+
+        Configuration files (.yeetconfig) provide persistent settings:
+          • Project config: ./.yeetconfig (team defaults)
+          • User config: ~/.yeetconfig (personal preferences)
+          • See CONFIGURATION.md for complete reference
         """,
         version: "1.0.0"
     )
@@ -112,6 +117,12 @@ struct Yeet: AsyncParsableCommand {
     )
     var quiet: Bool = false
 
+    @Flag(
+        name: .long,
+        help: "Run performance benchmark (3 iterations, reports timing)"
+    )
+    var benchmark: Bool = false
+
     // MARK: - Advanced Options
 
     @Option(
@@ -149,6 +160,9 @@ struct Yeet: AsyncParsableCommand {
     // MARK: - Execution
 
     mutating func run() async throws {
+        // Load hierarchical config (.yeetconfig → ~/.yeetconfig → defaults)
+        let loadedConfig = ConfigLoader.loadConfig(for: root ?? ".")
+
         // Determine final paths
         let finalPaths: [String]
         if let filesFromPath = filesFrom {
@@ -159,28 +173,47 @@ struct Yeet: AsyncParsableCommand {
             finalPaths = ["."]
         }
 
+        // Merge CLI flags with config (CLI takes priority)
+        let effectiveMaxTokens = maxTokens != 10000 ? maxTokens : (loadedConfig.defaults?.maxTokens ?? 10000)
+        let effectiveMaxFiles = maxFiles != 10_000 ? maxFiles : (loadedConfig.defaults?.maxFiles ?? 10_000)
+        let effectiveMaxFileSizeMB = maxFileSizeMB != 100 ? maxFileSizeMB : (loadedConfig.defaults?.maxFileSizeMB ?? 100)
+        let effectiveMaxTotalTokens = maxTotalTokens != 1_000_000 ? maxTotalTokens : (loadedConfig.defaults?.maxTotalTokens ?? 1_000_000)
+        let effectiveShowTree = tree || (loadedConfig.defaults?.showTree ?? false)
+        let effectiveQuiet = quiet || (loadedConfig.defaults?.quiet ?? false)
+
+        // Merge include/exclude patterns
+        let effectiveIncludePatterns = !include.isEmpty ? include : (loadedConfig.include?.patterns ?? [])
+        let effectiveExcludeDirectories = !exclude.isEmpty ? exclude : (loadedConfig.exclude?.directories ?? [])
+        let effectiveTypeFilters = !type.isEmpty ? type : (loadedConfig.include?.types ?? [])
+
+        // Merge git config
+        let effectiveIncludeHistory = withoutHistory ? false : (loadedConfig.git?.includeHistory ?? true)
+        let effectiveHistoryMode = historyMode != "summary" ? historyMode : (loadedConfig.git?.historyMode ?? "summary")
+        let effectiveHistoryCount = historyCount != 5 ? historyCount : (loadedConfig.git?.historyCount ?? 5)
+
         // Configure safety limits
         let safetyLimits = SafetyLimits(
-            maxFiles: maxFiles,
-            maxFileSize: maxFileSizeMB * 1024 * 1024,  // Convert MB to bytes
-            maxTotalTokens: maxTotalTokens
+            maxFiles: effectiveMaxFiles,
+            maxFileSize: effectiveMaxFileSizeMB * 1024 * 1024,  // Convert MB to bytes
+            maxTotalTokens: effectiveMaxTotalTokens
         )
 
         // Configure collector
         let config = CollectorConfiguration(
             paths: finalPaths,
-            maxTokens: maxTokens,
-            includePatterns: include,
-            excludeDirectories: exclude,
-            typeFilters: type,
+            maxTokens: effectiveMaxTokens,
+            includePatterns: effectiveIncludePatterns,
+            excludeDirectories: effectiveExcludeDirectories,
+            typeFilters: effectiveTypeFilters,
+            tokenLimits: loadedConfig.tokenLimits,
             diffMode: diff,
-            includeHistory: !withoutHistory,
-            historyMode: historyMode,
-            historyCount: historyCount,
+            includeHistory: effectiveIncludeHistory,
+            historyMode: effectiveHistoryMode,
+            historyCount: effectiveHistoryCount,
             outputJSON: json,
             listOnly: listOnly,
-            showTree: tree,
-            quiet: quiet,
+            showTree: effectiveShowTree,
+            quiet: effectiveQuiet,
             rootDirectory: root,
             encodingPath: encodingPath,
             safetyLimits: safetyLimits
@@ -188,19 +221,56 @@ struct Yeet: AsyncParsableCommand {
 
         // Execute collection
         let collector = ContextCollector(configuration: config)
-        let result = try await collector.collect()
 
-        if listOnly {
-            print(result.fileList)
+        if benchmark {
+            try await runBenchmark(collector: collector)
         } else {
-            try result.copyToClipboard()
-            print("✓ Context copied to clipboard!")
-            print("  Files: \(result.fileCount)")
-            print("  Tokens: \(result.totalTokens)")
+            let result = try await collector.collect()
+
+            if listOnly {
+                print(result.fileList)
+            } else {
+                try result.copyToClipboard()
+                print("✓ Context copied to clipboard!")
+                print("  Files: \(result.fileCount)")
+                print("  Tokens: \(result.totalTokens)")
+            }
         }
     }
 
     // MARK: - Helpers
+
+    private func runBenchmark(collector: ContextCollector) async throws {
+        let iterations = 3
+        var times: [Double] = []
+        var fileCount = 0
+        var tokenCount = 0
+
+        print("🔥 Running benchmark (\(iterations) iterations)...\n")
+
+        for i in 1...iterations {
+            let start = Date()
+            let result = try await collector.collect()
+            let elapsed = Date().timeIntervalSince(start)
+            times.append(elapsed)
+
+            fileCount = result.fileCount
+            tokenCount = result.totalTokens
+
+            print("  Iteration \(i): \(String(format: "%.3f", elapsed))s")
+        }
+
+        let average = times.reduce(0, +) / Double(times.count)
+        let min = times.min() ?? 0
+        let max = times.max() ?? 0
+
+        print("\n📊 Benchmark Results:")
+        print("  Files:     \(fileCount)")
+        print("  Tokens:    \(tokenCount)")
+        print("  Average:   \(String(format: "%.3f", average))s")
+        print("  Best:      \(String(format: "%.3f", min))s")
+        print("  Worst:     \(String(format: "%.3f", max))s")
+    }
 
     private func loadPathsFromFile(_ path: String) throws -> [String] {
         let content: String

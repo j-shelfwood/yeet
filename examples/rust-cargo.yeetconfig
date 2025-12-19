@@ -1,0 +1,46 @@
+# Rust + Cargo Project Configuration
+# Optimized for Rust projects using Cargo
+
+[defaults]
+max_tokens = 10000
+show_tree = false
+quiet = false
+
+[exclude]
+# Rust build artifacts
+directories = [
+    "target",                    # Cargo build directory
+    "Cargo.lock"                 # Lock file (keep for apps, exclude for libs)
+]
+
+extensions = [
+    "rlib",                      # Rust library
+    "so",                        # Shared library
+    "dylib",
+    "pdb"                        # Debug symbols
+]
+
+[include]
+# Rust source and config files
+patterns = [
+    "*.rs",
+    "*.toml",
+    "*.md",
+    "Cargo.toml",
+    "Cargo.lock",                # Include for review
+    "build.rs",                  # Build scripts
+    ".cargo/config.toml"
+]
+
+[token_limits]
+# Limit lock file size
+"Cargo.lock" = 500
+"*test*.rs" = 4000               # Test modules
+
+[git]
+include_history = true
+history_mode = "full"            # Rust devs often want detailed history
+history_count = 10
+
+[performance]
+mode = "zero-tokenization"

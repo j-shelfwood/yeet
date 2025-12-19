@@ -39,6 +39,30 @@ public final class Tokenizer: @unchecked Sendable {
         return Int(tokens.count)
     }
 
+    /// Encode text to token array using exact BPE tokenization
+    ///
+    /// - Parameter text: Text to tokenize
+    /// - Returns: Array of token IDs (UInt32)
+    /// - Throws: TokenizerError if encoder initialization fails
+    /// - Note: Thread-safe, can be called from multiple threads simultaneously
+    public func encode(text: String) async throws -> [UInt32] {
+        let encoder = try await getEncoder()
+        return encoder.encode(text: text, allowedSpecial: [])
+    }
+
+    /// Decode token array back to text
+    ///
+    /// - Parameter tokens: Array of token IDs
+    /// - Returns: Decoded text string
+    /// - Throws: TokenizerError if encoder initialization fails or decoding fails
+    public func decode(tokens: [UInt32]) async throws -> String {
+        let encoder = try await getEncoder()
+        guard let decoded = try encoder.decode(tokens: tokens) else {
+            throw TokenizerError.initializationFailed("Failed to decode tokens")
+        }
+        return decoded
+    }
+
     /// Get or initialize the encoder (thread-safe with proper gating)
     private func getEncoder() async throws -> CoreBpe {
         // Fast path: encoder already initialized

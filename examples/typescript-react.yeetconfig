@@ -1,0 +1,62 @@
+# TypeScript + React Project Configuration
+# Optimized for modern JavaScript/TypeScript web applications
+
+[defaults]
+max_tokens = 8000
+show_tree = true                 # Helpful for web project structure
+quiet = false
+
+[exclude]
+# Node.js and build artifacts
+directories = [
+    "node_modules",
+    "dist",
+    "build",
+    ".next",                     # Next.js
+    ".nuxt",                     # Nuxt
+    "out",                       # Next.js static export
+    "coverage",                  # Test coverage
+    ".cache",                    # Build cache
+    ".vercel",                   # Vercel deployment
+    ".netlify"                   # Netlify deployment
+]
+
+extensions = [
+    "map",                       # Source maps
+    "lock"                       # Lock files
+]
+
+[include]
+# TypeScript, React, and config files
+patterns = [
+    "*.ts", "*.tsx",
+    "*.js", "*.jsx",
+    "*.css", "*.scss", "*.sass",
+    "*.json",
+    "*.md",
+    "package.json",
+    "tsconfig.json",
+    ".env.example"               # Include example env, not actual .env
+]
+
+[token_limits]
+# Skip or limit large/generated files
+"package-lock.json" = 0          # Skip entirely
+"yarn.lock" = 0
+"*.min.js" = 0                   # Minified files
+"*.min.css" = 0
+"*.test.ts" = 2000               # Limit test files
+"*.test.tsx" = 2000
+"*.spec.ts" = 2000
+
+[git]
+include_history = true
+history_mode = "summary"
+history_count = 3
+
+[output]
+format = "text"
+include_tree = true              # Show project structure
+
+[performance]
+mode = "zero-tokenization"

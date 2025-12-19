@@ -20,7 +20,7 @@ final class IntegrationTests: XCTestCase {
 
     // MARK: - Safety Limits Tests
 
-    func testMaxFilesLimit() throws {
+    func testMaxFilesLimit() async throws {
         // Create more files than limit
         for i in 1...15 {
             let file = tempDir.appendingPathComponent("file\(i).swift")
@@ -40,7 +40,10 @@ final class IntegrationTests: XCTestCase {
 
         let collector = ContextCollector(configuration: config)
 
-        XCTAssertThrowsError(try collector.collect()) { error in
+        do {
+            _ = try await collector.collect()
+            XCTFail("Expected tooManyFiles error")
+        } catch let error as YeetError {
             guard case YeetError.tooManyFiles(let found, let limit) = error else {
                 XCTFail("Expected tooManyFiles error, got \(error)")
                 return
@@ -50,7 +53,7 @@ final class IntegrationTests: XCTestCase {
         }
     }
 
-    func testMaxFileSizeLimit() throws {
+    func testMaxFileSizeLimit() async throws {
         // Create a large file (2MB)
         let largeFile = tempDir.appendingPathComponent("large.swift")
         let largeContent = String(repeating: "a", count: 2 * 1024 * 1024) // 2MB
@@ -68,20 +71,26 @@ final class IntegrationTests: XCTestCase {
         )
 
         let collector = ContextCollector(configuration: config)
-        let result = try collector.collect()
+        let result = try await collector.collect()
 
-        // File should be collected but with 0 tokens (skipped)
+        // File should be collected with skip message
+        // In zero-tokenization mode, the skip message is included in final output
+        // which means totalTokens > 0 (from formatting/headers/skip message)
         XCTAssertEqual(result.fileCount, 1)
-        XCTAssertEqual(result.totalTokens, 0)
+        XCTAssertGreaterThan(result.totalTokens, 0)
+        // Verify tokens are much smaller than if 2MB file was included
+        XCTAssertLessThan(result.totalTokens, 1000)
     }
 
-    func testMaxTotalTokensLimit() throws {
+    func testMaxTotalTokensLimit() async throws {
         // Create files that would exceed token limit
+        // Note: With BPE tokenization, we need diverse content (repeated chars compress heavily)
         for i in 1...10 {
             let file = tempDir.appendingPathComponent("file\(i).swift")
-            // Create ~2500 tokens per file (2500 * 4 chars = 10000 chars)
-            let content = String(repeating: "x", count: 10000) + "\n"
-            try content.write(to: file, atomically: true, encoding: .utf8)
+            // Create realistic Swift code that will have ~2500 tokens
+            // Each unique word is typically 1-2 tokens
+            let words = (0..<1250).map { "variable\($0)" }.joined(separator: " ")
+            try words.write(to: file, atomically: true, encoding: .utf8)
         }
 
         let safetyLimits = SafetyLimits(
@@ -98,7 +107,10 @@ final class IntegrationTests: XCTestCase {
 
         let collector = ContextCollector(configuration: config)
 
-        XCTAssertThrowsError(try collector.collect()) { error in
+        do {
+            _ = try await collector.collect()
+            XCTFail("Expected tooManyTokens error")
+        } catch let error as YeetError {
             guard case YeetError.tooManyTokens = error else {
                 XCTFail("Expected tooManyTokens error, got \(error)")
                 return
@@ -108,7 +120,7 @@ final class IntegrationTests: XCTestCase {
 
     // MARK: - Directory Exclusion Tests
 
-    func testExcludeDirectories() throws {
+    func testExcludeDirectories() async throws {
         // Create directory structure
         let srcDir = tempDir.appendingPathComponent("src")
         let buildDir = tempDir.appendingPathComponent("build")
@@ -127,7 +139,7 @@ final class IntegrationTests: XCTestCase {
         )
 
         let collector = ContextCollector(configuration: config)
-        let result = try collector.collect()
+        let result = try await collector.collect()
 
         // Should only find src file
         XCTAssertEqual(result.fileCount, 1)
@@ -137,7 +149,7 @@ final class IntegrationTests: XCTestCase {
 
     // MARK: - Pattern Filtering Tests
 
-    func testMultipleIncludePatterns() throws {
+    func testMultipleIncludePatterns() async throws {
         // Create files with different extensions
         try "swift".write(to: tempDir.appendingPathComponent("app.swift"), atomically: true, encoding: .utf8)
         try "ts".write(to: tempDir.appendingPathComponent("app.ts"), atomically: true, encoding: .utf8)
@@ -149,7 +161,7 @@ final class IntegrationTests: XCTestCase {
         )
 
         let collector = ContextCollector(configuration: config)
-        let result = try collector.collect()
+        let result = try await collector.collect()
 
         // Should find swift and ts files, not json
         XCTAssertEqual(result.fileCount, 2)
@@ -158,7 +170,7 @@ final class IntegrationTests: XCTestCase {
         XCTAssertFalse(result.fileList.contains("config.json"))
     }
 
-    func testTypeFilters() throws {
+    func testTypeFilters() async throws {
         // Create files with different extensions
         try "swift".write(to: tempDir.appendingPathComponent("app.swift"), atomically: true, encoding: .utf8)
         try "py".write(to: tempDir.appendingPathComponent("script.py"), atomically: true, encoding: .utf8)
@@ -169,7 +181,7 @@ final class IntegrationTests: XCTestCase {
         )
 
         let collector = ContextCollector(configuration: config)
-        let result = try collector.collect()
+        let result = try await collector.collect()
 
         // Should only find swift file
         XCTAssertEqual(result.fileCount, 1)
@@ -179,7 +191,7 @@ final class IntegrationTests: XCTestCase {
 
     // MARK: - Output Format Tests
 
-    func testJSONOutput() throws {
+    func testJSONOutput() async throws {
         let file = tempDir.appendingPathComponent("test.swift")
         try "test content".write(to: file, atomically: true, encoding: .utf8)
 
@@ -189,7 +201,7 @@ final class IntegrationTests: XCTestCase {
         )
 
         let collector = ContextCollector(configuration: config)
-        let result = try collector.collect()
+        let result = try await collector.collect()
 
         // Should be valid JSON
         guard let data = result.fileList.data(using: .utf8),
@@ -205,7 +217,7 @@ final class IntegrationTests: XCTestCase {
 
     // MARK: - Real-World Scenarios
 
-    func testMixedProjectStructure() throws {
+    func testMixedProjectStructure() async throws {
         // Create a realistic project structure
         let dirs = ["src", "tests", "node_modules", ".git", "build"]
         for dir in dirs {
@@ -218,7 +230,7 @@ final class IntegrationTests: XCTestCase {
 
         let config = CollectorConfiguration(paths: [tempDir.path])
         let collector = ContextCollector(configuration: config)
-        let result = try collector.collect()
+        let result = try await collector.collect()
 
         // Should exclude node_modules, .git, build
         XCTAssertGreaterThan(result.fileCount, 0)

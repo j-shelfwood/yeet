@@ -1,0 +1,20 @@
+# Minimal Yeet Configuration
+# Quick start config with essential settings only
+
+[defaults]
+max_tokens = 8000                # Reduce token limit for faster processing
+quiet = true                      # Suppress progress output
+
+[exclude]
+# Common directories to skip
+directories = [
+    "node_modules",
+    ".git",
+    "build",
+    "dist"
+]
+
+# Skip lock files entirely
+[token_limits]
+"*.lock" = 0
+"package-lock.json" = 0

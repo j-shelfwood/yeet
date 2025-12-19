@@ -1,0 +1,120 @@
+# Yeet Configuration Template
+# Save this as .yeetconfig in your project root or ~/.yeetconfig for user defaults
+#
+# Priority: CLI flags > ./.yeetconfig (project) > ~/.yeetconfig (user) > defaults
+
+[defaults]
+# Token and file limits
+max_tokens = 10000              # Maximum tokens per file
+max_files = 10000               # Maximum number of files to collect
+max_file_size_mb = 100          # Maximum file size in MB
+max_total_tokens = 1000000      # Maximum total tokens across all files
+
+# Output preferences
+show_tree = false               # Include directory tree in output
+quiet = false                   # Suppress progress indicators
+
+[exclude]
+# Directories to skip (matched by name)
+directories = [
+    "node_modules",
+    "vendor",
+    "build",
+    ".build",
+    ".git",
+    ".vscode",
+    ".swiftpm",
+    "venv",
+    ".env",
+    "storage",
+    "public/storage",
+    "Library",
+    "Temp",
+    "target",            # Rust
+    "dist",              # JavaScript builds
+    "coverage",          # Test coverage
+    ".next",             # Next.js
+    ".nuxt",             # Nuxt
+]
+
+# File extensions to skip
+extensions = [
+    "zip", "tar", "gz", "rar", "7z",        # Archives
+    "exe", "bin", "so", "dll", "dylib",     # Binaries
+    "jar", "pyc", "class",                  # Compiled
+    "o", "a", "obj", "lib",                 # Object files
+    "woff", "woff2", "eot", "ttf", "otf",   # Fonts
+    "db", "sqlite", "lock",                 # Databases/locks
+]
+
+# Glob patterns to exclude
+patterns = []
+
+[include]
+# File patterns to include when walking directories
+patterns = [
+    # Swift
+    "*.swift", "*.h", "*.m",
+    # JavaScript/TypeScript
+    "*.ts", "*.tsx", "*.js", "*.jsx",
+    # Python
+    "*.py",
+    # Ruby
+    "*.rb",
+    # PHP
+    "*.php",
+    # Rust, Go, Java, Kotlin
+    "*.rs", "*.go", "*.java", "*.kt",
+    # C/C++/C#
+    "*.c", "*.cpp", "*.cs",
+    # Documentation
+    "*.md", "*.txt",
+    # Config files
+    "*.json", "*.yaml", "*.yml", "*.toml",
+    # Web
+    "*.html", "*.css", "*.scss",
+    # Scripts
+    "*.sh", "*.bash",
+    # Special files
+    "Makefile", "Dockerfile",
+    ".gitignore", ".gitattributes",
+]
+
+[token_limits]
+# Pattern-based token limits for content-aware truncation
+# Useful for reducing noise from auto-generated or low-value files
+# Set to 0 to skip files entirely
+
+# Lock files (package-lock.json, composer.lock, etc.)
+"*.lock" = 500
+"*-lock.json" = 500
+"package-lock.json" = 500
+"composer.lock" = 500
+"Gemfile.lock" = 500
+"*.resolved" = 500
+
+# Minified files (skip entirely)
+"*.min.*" = 0
+"*.bundle.*" = 0
+
+# Mock/test data
+"**/mocks/**" = 1000
+"*mock*.json" = 1000
+
+# API specs/schemas
+"*api*.json" = 2000
+
+[git]
+# Git history integration
+include_history = true          # Include commit history in output
+history_mode = "summary"        # Options: "none", "summary", "full"
+history_count = 5               # Number of commits to include
+
+[output]
+# Output formatting
+format = "text"                 # Options: "text", "json"
+include_tree = false            # Show directory structure
+
+[performance]
+# Performance tuning
+mode = "zero-tokenization"      # Options: "zero-tokenization" (fast), "content-aware" (precise)

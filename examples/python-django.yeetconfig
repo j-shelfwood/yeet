@@ -1,0 +1,62 @@
+# Python + Django Project Configuration
+# Optimized for Django web applications
+
+[defaults]
+max_tokens = 10000
+quiet = false
+
+[exclude]
+# Python-specific artifacts
+directories = [
+    "venv",                      # Virtual environment
+    ".venv",
+    "env",
+    ".env",
+    "__pycache__",               # Python bytecode cache
+    ".pytest_cache",             # Pytest cache
+    ".mypy_cache",               # MyPy type checker cache
+    "htmlcov",                   # Coverage HTML reports
+    "dist",                      # Distribution packages
+    "build",
+    "*.egg-info",
+    ".tox",                      # Tox testing
+    "migrations",                # Django migrations (often auto-generated)
+    "staticfiles",               # Django collected static files
+    "media"                      # User-uploaded media
+]
+
+extensions = [
+    "pyc",                       # Compiled Python
+    "pyo",
+    "pyd",
+    "so",                        # Shared libraries
+    "db",                        # SQLite databases
+    "sqlite3"
+]
+
+[include]
+# Python source and config files
+patterns = [
+    "*.py",
+    "*.yaml", "*.yml",
+    "*.toml",
+    "*.txt",                     # requirements.txt, etc.
+    "*.md",
+    "*.ini",                     # setup.cfg, tox.ini
+    "manage.py",
+    "Makefile"
+]
+
+[token_limits]
+# Limit auto-generated and test files
+"**/migrations/**" = 500         # Django migration files
+"*test*.py" = 3000               # Test files
+"**/fixtures/**" = 1000          # Test fixtures
+
+[git]
+include_history = true
+history_mode = "summary"
+history_count = 5
+
+[performance]
+mode = "zero-tokenization"

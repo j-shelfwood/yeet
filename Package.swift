@@ -15,6 +15,10 @@ let package = Package(
             url: "https://github.com/apple/swift-argument-parser",
             from: "1.3.0"
         ),
+        .package(
+            url: "https://github.com/LebJe/TOMLKit.git",
+            from: "0.5.0"
+        ),
     ],
     targets: [
         // Rust-backed TiktokenFFI binary framework
@@ -43,6 +47,7 @@ let package = Package(
             name: "YeetCore",
             dependencies: [
                 "TiktokenSwift",
+                .product(name: "TOMLKit", package: "TOMLKit"),
             ]
         ),
 

@@ -3,7 +3,7 @@ import Foundation
 /// File truncation strategies for token limit enforcement
 public struct TruncationStrategy {
 
-    /// Truncate content using head + tail strategy
+    /// Truncate content using head + tail strategy (TOKEN-BASED - ZERO LINE-BY-LINE FFI)
     ///
     /// Preserves beginning and end of file for better context.
     /// Uses 75% tokens from head, 25% from tail.
@@ -11,7 +11,6 @@ public struct TruncationStrategy {
     /// - Parameters:
     ///   - content: Original file content
     ///   - limit: Maximum token count
-    ///   - tokenizer: Tokenizer instance for accurate token counting
     /// - Returns: Truncated content with marker
     ///
     /// ## Strategy
@@ -20,79 +19,73 @@ public struct TruncationStrategy {
     /// - Preserves imports and declarations (head)
     /// - Preserves closing code and exports (tail)
     /// - Shows file structure more completely
-    public static func truncateHeadTail(_ content: String, limit: Int) -> String {
-        let lines = content.components(separatedBy: .newlines)
+    ///
+    /// ## Performance Optimization (CRITICAL)
+    ///
+    /// **SINGLE FFI CALL APPROACH:**
+    /// 1. Tokenize entire file ONCE → `[UInt32]` token array
+    /// 2. Slice token array (pure array operations, no FFI)
+    /// 3. Decode head and tail slices back to text (2 FFI calls total)
+    ///
+    /// **Old approach:** 1000 lines = 2000+ FFI calls (line-by-line)
+    /// **New approach:** Any file = 3 FFI calls (encode, decode head, decode tail)
+    ///
+    /// This eliminates "FFI Marshaling Death" - the primary performance bottleneck.
+    public static func truncateHeadTail(_ content: String, limit: Int) async throws -> String {
+        // SINGLE FFI CALL: Encode entire file to tokens
+        let allTokens = try await Tokenizer.shared.encode(text: content)
+
+        // Fast path: Already under limit
+        if allTokens.count <= limit {
+            return content
+        }
 
         // 75% tokens from head, 25% from tail
         let headTokenLimit = Int(Double(limit) * 0.75)
         let tailTokenLimit = Int(Double(limit) * 0.25)
 
-        // Find head lines
-        var headLines: [String] = []
-        var headTokens = 0
+        // PURE ARRAY SLICING (no FFI)
+        let headTokens = Array(allTokens.prefix(headTokenLimit))
+        let tailTokens = Array(allTokens.suffix(tailTokenLimit))
 
-        for line in lines {
-            let lineTokens = Tokenizer.estimateTokensPerLine(line)
-            if headTokens + lineTokens > headTokenLimit {
-                break
-            }
-            headLines.append(line)
-            headTokens += lineTokens
-        }
+        // Decode head and tail (2 FFI calls)
+        let headText = try await Tokenizer.shared.decode(tokens: headTokens)
+        let tailText = try await Tokenizer.shared.decode(tokens: tailTokens)
 
-        // Find tail lines (work backwards)
-        var tailLines: [String] = []
-        var tailTokens = 0
-
-        for line in lines.reversed() {
-            let lineTokens = Tokenizer.estimateTokensPerLine(line)
-            if tailTokens + lineTokens > tailTokenLimit {
-                break
-            }
-            tailLines.insert(line, at: 0)
-            tailTokens += lineTokens
-        }
-
-        // Ensure no overlap (tail starting before head ends)
-        let headEndIndex = headLines.count
-        let tailStartIndex = lines.count - tailLines.count
-
-        if headEndIndex >= tailStartIndex {
-            // Overlap detected, use head-only truncation
-            return headLines.joined(separator: "\n")
-        }
-
-        // Calculate omitted lines
-        let omittedLines = tailStartIndex - headEndIndex
-        let truncationMarker = "\n\n[... TRUNCATED - \(omittedLines) lines omitted ...]\n\n"
+        // Calculate omitted tokens for marker
+        let omittedTokens = allTokens.count - headTokens.count - tailTokens.count
+        let truncationMarker = "\n\n[... TRUNCATED - \(omittedTokens) tokens omitted ...]\n\n"
 
         // Combine head + marker + tail
-        return headLines.joined(separator: "\n") + truncationMarker + tailLines.joined(separator: "\n")
+        return headText + truncationMarker + tailText
     }
 
-    /// Truncate content using head-only strategy
+    /// Truncate content using head-only strategy (TOKEN-BASED - ZERO LINE-BY-LINE FFI)
     ///
     /// Simpler strategy that only preserves beginning of file.
     ///
     /// - Parameters:
     ///   - content: Original file content
     ///   - limit: Maximum token count
-    ///   - tokenizer: Tokenizer instance for accurate token counting
     /// - Returns: Truncated content
-    public static func truncateHeadOnly(_ content: String, limit: Int) -> String {
-        let lines = content.components(separatedBy: .newlines)
-        var result: [String] = []
-        var tokenCount = 0
+    ///
+    /// ## Performance Optimization
+    ///
+    /// **Old approach:** N lines = N FFI calls
+    /// **New approach:** 2 FFI calls (encode once, decode once)
+    public static func truncateHeadOnly(_ content: String, limit: Int) async throws -> String {
+        // SINGLE FFI CALL: Encode entire file
+        let allTokens = try await Tokenizer.shared.encode(text: content)
 
-        for line in lines {
-            let lineTokens = Tokenizer.estimateTokensPerLine(line)
-            if tokenCount + lineTokens > limit {
-                break
-            }
-            result.append(line)
-            tokenCount += lineTokens
+        // Fast path: Already under limit
+        if allTokens.count <= limit {
+            return content
         }
 
-        return result.joined(separator: "\n")
+        // PURE ARRAY SLICING (no FFI)
+        let headTokens = Array(allTokens.prefix(limit))
+
+        // SINGLE FFI CALL: Decode head
+        return try await Tokenizer.shared.decode(tokens: headTokens)
     }
 }
