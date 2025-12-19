@@ -6,8 +6,19 @@ A Swift CLI tool that aggregates source code and git history into clipboard-read
 
 ## Installation
 
+### Homebrew (macOS ARM64)
+
 ```bash
-git clone https://github.com/shelfwood/yeet
+brew tap j-shelfwood/yeet
+brew install yeet-ai
+```
+
+> **Note:** The formula is named `yeet-ai` to avoid conflict with another package in homebrew-core.
+
+### Building from Source
+
+```bash
+git clone https://github.com/j-shelfwood/yeet
 cd yeet
 swift build -c release
 cp .build/release/yeet /usr/local/bin/
@@ -16,6 +27,7 @@ cp .build/release/yeet /usr/local/bin/
 **Requirements:**
 - macOS 13.0+
 - Swift 5.9+
+- Xcode 14.0+ (for building from source)
 
 ## Usage
 
