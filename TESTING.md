@@ -5,11 +5,10 @@
 ```
 Tests/
 └── YeetCoreTests/
-    ├── FileReaderTests.swift
-    ├── PatternMatcherTests.swift
-    ├── OutputFormatterTests.swift
-    └── Integration/
-        └── EndToEndTests.swift
+    ├── ContextCollectorTests.swift
+    ├── FilePatternsTests.swift
+    ├── IntegrationTests.swift
+    └── PathResolverTests.swift
 ```
 
 ## Running Tests
@@ -245,18 +244,6 @@ yeet --json | jq '.files[] | select(.wasTruncated == true) | .path'
 ```
 
 ## Known Issues
-
-### Token Count Accuracy
-
-Token counting uses 4-char heuristic (~89% accurate). For exact counts, use tiktoken externally:
-
-```bash
-yeet --json | jq -r '.files[].content' | python3 -c "
-import sys, tiktoken
-enc = tiktoken.get_encoding('cl100k_base')
-print(len(enc.encode(sys.stdin.read())))
-"
-```
 
 ### Case Sensitivity
 

@@ -63,6 +63,7 @@ public struct CollectorConfiguration {
     public let includePatterns: [String]
     public let excludeDirectories: [String]
     public let typeFilters: [String]
+    public let tokenLimits: [String: Int]?
 
     // MARK: - Git Integration
 
@@ -92,6 +93,7 @@ public struct CollectorConfiguration {
         includePatterns: [String] = [],
         excludeDirectories: [String] = [],
         typeFilters: [String] = [],
+        tokenLimits: [String: Int]? = nil,
         diffMode: Bool = false,
         includeHistory: Bool = true,
         historyMode: String = "summary",
@@ -109,6 +111,7 @@ public struct CollectorConfiguration {
         self.includePatterns = includePatterns
         self.excludeDirectories = excludeDirectories
         self.typeFilters = typeFilters
+        self.tokenLimits = tokenLimits
         self.diffMode = diffMode
         self.includeHistory = includeHistory
         self.historyMode = historyMode

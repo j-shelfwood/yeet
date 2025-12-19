@@ -76,7 +76,7 @@ ContextCollector (orchestrator)
 
 - Smart truncation (head + tail strategy)
 - Binary file detection
-- Token counting (4-char heuristic)
+- Exact BPE token counting (Rust-backed tiktoken)
 - UTF-8 validation
 
 ### 5. Git Subsystem (`Sources/YeetCore/Git/`)

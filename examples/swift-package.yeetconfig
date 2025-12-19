@@ -1,0 +1,44 @@
+# Swift Package Manager Project Configuration
+# Optimized for Swift projects using SPM
+
+[defaults]
+max_tokens = 10000
+show_tree = false
+quiet = false
+
+[exclude]
+# Swift-specific build artifacts
+directories = [
+    ".build",                    # SPM build directory
+    ".swiftpm",                  # SPM cache
+    "DerivedData",               # Xcode build products
+    ".DS_Store",
+    "xcuserdata"
+]
+
+extensions = [
+    "xcworkspace",               # Xcode workspace (binary)
+    "xcodeproj"                  # Xcode project (can be large)
+]
+
+[include]
+# Swift source files and configs
+patterns = [
+    "*.swift",
+    "*.h", "*.m",                # Objective-C bridging headers
+    "Package.swift",
+    "*.md",
+    ".swift-version"
+]
+
+[token_limits]
+# Limit SPM resolved dependencies file
+"Package.resolved" = 500
+
+[git]
+include_history = true
+history_mode = "summary"
+history_count = 5
+
+[performance]
+mode = "zero-tokenization"

@@ -13,7 +13,9 @@ swift build -c release
 cp .build/release/yeet /usr/local/bin/
 ```
 
-**Requirements:** macOS 13.0+, Swift 5.9+
+**Requirements:**
+- macOS 13.0+
+- Swift 5.9+
 
 ## Usage
 
@@ -59,6 +61,45 @@ yeet --quiet --json > context.json
 --no-tree               # Skip directory tree
 ```
 
+## Configuration
+
+Yeet supports hierarchical configuration through `.yeetconfig` files (TOML format):
+
+**Priority (highest to lowest):**
+1. Command-line flags
+2. `./.yeetconfig` (project root)
+3. `~/.yeetconfig` (user home)
+4. Built-in defaults
+
+**Quick Start:**
+
+```bash
+# Create user-level defaults
+cp .yeetconfig.template ~/.yeetconfig
+
+# Create project-specific config
+cp .yeetconfig.template .yeetconfig
+```
+
+**Example config:**
+
+```toml
+[defaults]
+max_tokens = 8000
+quiet = true
+
+[exclude]
+directories = ["node_modules", "dist", "coverage"]
+
+[token_limits]
+"*.lock" = 500        # Limit lock files
+"*.min.*" = 0         # Skip minified files
+```
+
+For complete reference, see:
+- [CONFIGURATION.md](CONFIGURATION.md) - Full configuration guide
+- [CLI_AND_CONFIG_REFERENCE.md](CLI_AND_CONFIG_REFERENCE.md) - CLI options reference
+
 ## Default File Types
 
 Web: `*.ts`, `*.js`, `*.html`, `*.css`, `*.astro`
@@ -68,6 +109,8 @@ Config: `*.json`, `*.yaml`, `*.toml`, `*.xml`
 
 ## Documentation
 
+- [CONFIGURATION.md](CONFIGURATION.md) - Configuration file reference
+- [CLI_AND_CONFIG_REFERENCE.md](CLI_AND_CONFIG_REFERENCE.md) - Complete CLI options
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System design and components
 - [TESTING.md](TESTING.md) - Testing strategy and examples
 

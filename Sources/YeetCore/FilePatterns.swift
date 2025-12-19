@@ -155,7 +155,17 @@ public enum FilePatterns {
     }
 
     /// Get maximum token limit for a file based on patterns
-    public static func getTokenLimit(for fileName: String, defaultLimit: Int) -> Int {
+    public static func getTokenLimit(for fileName: String, defaultLimit: Int, customLimits: [String: Int]? = nil) -> Int {
+        // Check custom limits first (from config)
+        if let customLimits = customLimits {
+            for (pattern, limit) in customLimits {
+                if matches(fileName: fileName, pattern: pattern) {
+                    return limit
+                }
+            }
+        }
+
+        // Fall back to hardcoded patterns
         for (pattern, limit) in lowValuePatterns {
             if matches(fileName: fileName, pattern: pattern) {
                 return limit

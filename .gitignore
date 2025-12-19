@@ -6,3 +6,6 @@ DerivedData/
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
+
+# Local config files (use .yeetconfig.template for examples)
+.yeetconfig

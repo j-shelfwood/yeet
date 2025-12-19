@@ -2,7 +2,7 @@ import XCTest
 @testable import YeetCore
 
 final class ContextCollectorTests: XCTestCase {
-    func testBasicCollection() throws {
+    func testBasicCollection() async throws {
         // Arrange
         let config = CollectorConfiguration(
             paths: ["."],
@@ -11,7 +11,7 @@ final class ContextCollectorTests: XCTestCase {
         let collector = ContextCollector(configuration: config)
 
         // Act
-        let result = try collector.collect()
+        let result = try await collector.collect()
 
         // Assert
         XCTAssertGreaterThanOrEqual(result.fileCount, 0)
