@@ -9,7 +9,7 @@ A Swift CLI tool that aggregates source code and git history into clipboard-read
 ### Homebrew (macOS ARM64)
 
 ```bash
-brew install j-shelfwood/yeet/yeet
+brew install j-shelfwood/tap/yeet
 ```
 
 > **Note:** Use the fully qualified name to avoid conflict with another package in homebrew-core.
