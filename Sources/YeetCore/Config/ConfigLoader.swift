@@ -98,43 +98,48 @@ public struct ConfigLoader {
 
     /// Parse TOML table into YeetConfig
     private static func parseYeetConfig(from table: TOMLTable) throws -> YeetConfig {
+        // Helper to safely extract TOMLTable from nested sections
+        func getTable(_ key: String) -> TOMLTable? {
+            return table[key]?.table
+        }
+
         return YeetConfig(
-            defaults: try? parseDefaultsConfig(from: table["defaults"] as? TOMLTable),
-            exclude: try? parseExcludeConfig(from: table["exclude"] as? TOMLTable),
-            include: try? parseIncludeConfig(from: table["include"] as? TOMLTable),
-            tokenLimits: parseTokenLimits(from: table["token_limits"] as? TOMLTable),
-            git: try? parseGitConfig(from: table["git"] as? TOMLTable),
-            output: try? parseOutputConfig(from: table["output"] as? TOMLTable),
-            performance: try? parsePerformanceConfig(from: table["performance"] as? TOMLTable)
+            defaults: try? parseDefaultsConfig(from: getTable("defaults")),
+            exclude: try? parseExcludeConfig(from: getTable("exclude")),
+            include: try? parseIncludeConfig(from: getTable("include")),
+            tokenLimits: parseTokenLimits(from: getTable("token_limits")),
+            git: try? parseGitConfig(from: getTable("git")),
+            output: try? parseOutputConfig(from: getTable("output")),
+            performance: try? parsePerformanceConfig(from: getTable("performance"))
         )
     }
 
     private static func parseDefaultsConfig(from table: TOMLTable?) throws -> DefaultsConfig? {
         guard let table = table else { return nil }
         return DefaultsConfig(
-            maxTokens: table["max_tokens"] as? Int,
-            maxFiles: table["max_files"] as? Int,
-            maxFileSizeMB: table["max_file_size_mb"] as? Int,
-            maxTotalTokens: table["max_total_tokens"] as? Int,
-            showTree: table["show_tree"] as? Bool,
-            quiet: table["quiet"] as? Bool
+            maxTokens: table["max_tokens"]?.int,
+            maxFiles: table["max_files"]?.int,
+            maxFileSizeMB: table["max_file_size_mb"]?.int,
+            maxTotalTokens: table["max_total_tokens"]?.int,
+            showTree: table["show_tree"]?.bool,
+            quiet: table["quiet"]?.bool
         )
     }
 
     private static func parseExcludeConfig(from table: TOMLTable?) throws -> ExcludeConfig? {
         guard let table = table else { return nil }
         return ExcludeConfig(
-            directories: table["directories"] as? [String],
-            extensions: table["extensions"] as? [String],
-            patterns: table["patterns"] as? [String]
+            directories: table["directories"]?.array?.compactMap { $0.string },
+            extensions: table["extensions"]?.array?.compactMap { $0.string },
+            patterns: table["patterns"]?.array?.compactMap { $0.string }
         )
     }
 
     private static func parseIncludeConfig(from table: TOMLTable?) throws -> IncludeConfig? {
         guard let table = table else { return nil }
         return IncludeConfig(
-            patterns: table["patterns"] as? [String],
-            types: table["types"] as? [String]
+            patterns: table["patterns"]?.array?.compactMap { $0.string },
+            types: table["types"]?.array?.compactMap { $0.string }
         )
     }
 
@@ -142,7 +147,7 @@ public struct ConfigLoader {
         guard let table = table else { return nil }
         var limits: [String: Int] = [:]
         for (key, value) in table {
-            if let intValue = value as? Int {
+            if let intValue = value.int {
                 limits[key] = intValue
             }
         }
@@ -152,24 +157,24 @@ public struct ConfigLoader {
     private static func parseGitConfig(from table: TOMLTable?) throws -> GitConfig? {
         guard let table = table else { return nil }
         return GitConfig(
-            includeHistory: table["include_history"] as? Bool,
-            historyMode: table["history_mode"] as? String,
-            historyCount: table["history_count"] as? Int
+            includeHistory: table["include_history"]?.bool,
+            historyMode: table["history_mode"]?.string,
+            historyCount: table["history_count"]?.int
         )
     }
 
     private static func parseOutputConfig(from table: TOMLTable?) throws -> OutputConfig? {
         guard let table = table else { return nil }
         return OutputConfig(
-            format: table["format"] as? String,
-            includeTree: table["include_tree"] as? Bool
+            format: table["format"]?.string,
+            includeTree: table["include_tree"]?.bool
         )
     }
 
     private static func parsePerformanceConfig(from table: TOMLTable?) throws -> PerformanceConfig? {
         guard let table = table else { return nil }
         return PerformanceConfig(
-            mode: table["mode"] as? String
+            mode: table["mode"]?.string
         )
     }
 

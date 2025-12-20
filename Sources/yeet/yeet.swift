@@ -160,10 +160,7 @@ struct Yeet: AsyncParsableCommand {
     // MARK: - Execution
 
     mutating func run() async throws {
-        // Load hierarchical config (.yeetconfig → ~/.yeetconfig → defaults)
-        let loadedConfig = ConfigLoader.loadConfig(for: root ?? ".")
-
-        // Determine final paths
+        // Determine final paths first
         let finalPaths: [String]
         if let filesFromPath = filesFrom {
             finalPaths = try loadPathsFromFile(filesFromPath)
@@ -172,6 +169,19 @@ struct Yeet: AsyncParsableCommand {
         } else {
             finalPaths = ["."]
         }
+
+        // Determine base path for config loading
+        // Priority: --root flag > first input path > current directory
+        let configBasePath: String
+        if let explicitRoot = root {
+            configBasePath = explicitRoot
+        } else {
+            // Use first input path as config base (supports both files and directories)
+            configBasePath = finalPaths.first ?? "."
+        }
+
+        // Load hierarchical config (.yeetconfig → ~/.yeetconfig → defaults)
+        let loadedConfig = ConfigLoader.loadConfig(for: configBasePath)
 
         // Merge CLI flags with config (CLI takes priority)
         let effectiveMaxTokens = maxTokens != 10000 ? maxTokens : (loadedConfig.defaults?.maxTokens ?? 10000)
