@@ -79,7 +79,10 @@ public struct GitDiscovery {
         let uniqueFiles = Array(Set(allFiles)).sorted { $0.path < $1.path }
 
         // Filter by patterns and exclusions
+        // BUGFIX: Check both config exclusions AND pattern matching
         let filtered = uniqueFiles.filter { url in
+            !matcher.isInExcludedDirectory(url) &&
+            !matcher.matchesExcludePattern(url) &&
             matcher.shouldInclude(url)
         }
 

@@ -194,6 +194,7 @@ struct Yeet: AsyncParsableCommand {
         // Merge include/exclude patterns
         let effectiveIncludePatterns = !include.isEmpty ? include : (loadedConfig.include?.patterns ?? [])
         let effectiveExcludeDirectories = !exclude.isEmpty ? exclude : (loadedConfig.exclude?.directories ?? [])
+        let effectiveExcludePatterns = loadedConfig.exclude?.patterns ?? []
         let effectiveTypeFilters = !type.isEmpty ? type : (loadedConfig.include?.types ?? [])
 
         // Merge git config
@@ -214,6 +215,7 @@ struct Yeet: AsyncParsableCommand {
             maxTokens: effectiveMaxTokens,
             includePatterns: effectiveIncludePatterns,
             excludeDirectories: effectiveExcludeDirectories,
+            excludePatterns: effectiveExcludePatterns,
             typeFilters: effectiveTypeFilters,
             tokenLimits: loadedConfig.tokenLimits,
             diffMode: diff,

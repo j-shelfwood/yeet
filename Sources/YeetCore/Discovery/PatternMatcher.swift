@@ -61,4 +61,21 @@ public struct PatternMatcher {
         }
         return false
     }
+
+    /// Check if a URL matches any exclude pattern
+    ///
+    /// - Parameter url: File URL to check
+    /// - Returns: True if URL matches any exclude pattern (glob-based)
+    public func matchesExcludePattern(_ url: URL) -> Bool {
+        // Get relative path for pattern matching (remove leading /)
+        let fullPath = url.path
+        let relativePath = fullPath.hasPrefix("/") ? String(fullPath.dropFirst()) : fullPath
+
+        for pattern in configuration.excludePatterns {
+            if FilePatterns.matchesPath(path: relativePath, pattern: pattern) {
+                return true
+            }
+        }
+        return false
+    }
 }

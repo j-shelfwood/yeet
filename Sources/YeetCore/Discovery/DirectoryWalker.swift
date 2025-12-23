@@ -67,6 +67,15 @@ public struct DirectoryWalker {
                 continue
             }
 
+            // Check for exclude patterns
+            if matcher.matchesExcludePattern(fileURL) {
+                if let resourceValues = try? fileURL.resourceValues(forKeys: [.isDirectoryKey]),
+                   resourceValues.isDirectory == true {
+                    enumerator.skipDescendants()
+                }
+                continue
+            }
+
             // Only collect files, not directories
             let resourceValues = try? fileURL.resourceValues(forKeys: [.isDirectoryKey])
             if resourceValues?.isDirectory != true {

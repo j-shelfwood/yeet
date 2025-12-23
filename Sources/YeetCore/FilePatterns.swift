@@ -148,6 +148,55 @@ public enum FilePatterns {
         return regex.firstMatch(in: fileName, options: [], range: range) != nil
     }
 
+    /// Check if a file path matches a glob pattern (supports ** for directory recursion)
+    public static func matchesPath(path: String, pattern: String) -> Bool {
+        // Convert glob pattern to regex
+        // Support ** for recursive directory matching
+        var regexPattern = ""
+        var i = pattern.startIndex
+
+        while i < pattern.endIndex {
+            let char = pattern[i]
+
+            // Check for **
+            if char == "*" {
+                let nextIndex = pattern.index(after: i)
+                if nextIndex < pattern.endIndex && pattern[nextIndex] == "*" {
+                    // ** matches any number of path components
+                    regexPattern += ".*"
+                    i = pattern.index(after: nextIndex)
+                    // Skip trailing / if present
+                    if i < pattern.endIndex && pattern[i] == "/" {
+                        i = pattern.index(after: i)
+                    }
+                    continue
+                } else {
+                    // Single * matches anything except /
+                    regexPattern += "[^/]*"
+                }
+            } else if char == "?" {
+                regexPattern += "[^/]"
+            } else if char == "." {
+                regexPattern += "\\."
+            } else if "+[](){}^$|\\".contains(char) {
+                regexPattern += "\\\(char)"
+            } else {
+                regexPattern += String(char)
+            }
+
+            i = pattern.index(after: i)
+        }
+
+        regexPattern += "$"
+
+        guard let regex = try? NSRegularExpression(pattern: regexPattern, options: []) else {
+            return false
+        }
+
+        let range = NSRange(path.startIndex..<path.endIndex, in: path)
+        return regex.firstMatch(in: path, options: [], range: range) != nil
+    }
+
     /// Check if a path should be excluded
     public static func isExcluded(path: String) -> Bool {
         let components = path.split(separator: "/").map(String.init)

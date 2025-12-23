@@ -62,6 +62,7 @@ public struct CollectorConfiguration {
 
     public let includePatterns: [String]
     public let excludeDirectories: [String]
+    public let excludePatterns: [String]
     public let typeFilters: [String]
     public let tokenLimits: [String: Int]?
 
@@ -92,6 +93,7 @@ public struct CollectorConfiguration {
         maxTokens: Int = 10000,
         includePatterns: [String] = [],
         excludeDirectories: [String] = [],
+        excludePatterns: [String] = [],
         typeFilters: [String] = [],
         tokenLimits: [String: Int]? = nil,
         diffMode: Bool = false,
@@ -110,6 +112,7 @@ public struct CollectorConfiguration {
         self.maxTokens = maxTokens
         self.includePatterns = includePatterns
         self.excludeDirectories = excludeDirectories
+        self.excludePatterns = excludePatterns
         self.typeFilters = typeFilters
         self.tokenLimits = tokenLimits
         self.diffMode = diffMode
