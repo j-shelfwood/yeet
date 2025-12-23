@@ -204,10 +204,52 @@ public enum FilePatterns {
     }
 
     /// Get maximum token limit for a file based on patterns
-    public static func getTokenLimit(for fileName: String, defaultLimit: Int, customLimits: [String: Int]? = nil) -> Int {
+    ///
+    /// Checks both filename patterns (e.g., "*.lock") and path patterns (e.g., "database/**")
+    ///
+    /// - Parameters:
+    ///   - fileName: The file name to check (e.g., "app.swift")
+    ///   - path: The full file path for path-based pattern matching (optional)
+    ///   - defaultLimit: Default token limit if no pattern matches
+    ///   - customLimits: Custom limits from config (pattern -> limit)
+    /// - Returns: Token limit for this file
+    public static func getTokenLimit(
+        for fileName: String,
+        path: String? = nil,
+        defaultLimit: Int,
+        customLimits: [String: Int]? = nil
+    ) -> Int {
         // Check custom limits first (from config)
         if let customLimits = customLimits {
+            // Convert absolute path to relative (remove leading /)
+            let relativePath: String?
+            if let path = path {
+                relativePath = path.hasPrefix("/") ? String(path.dropFirst()) : path
+            } else {
+                relativePath = nil
+            }
+
             for (pattern, limit) in customLimits {
+                // Try path-based matching first (if path provided and pattern has /)
+                if let relativePath = relativePath, pattern.contains("/") {
+                    // Try matching against relative path
+                    if matchesPath(path: relativePath, pattern: pattern) {
+                        return limit
+                    }
+
+                    // Also try matching against just the suffix (for patterns like "lang/*.json")
+                    // Extract the last N components that match the pattern depth
+                    let patternComponents = pattern.split(separator: "/").count
+                    let pathComponents = relativePath.split(separator: "/")
+                    if pathComponents.count >= patternComponents {
+                        let suffix = pathComponents.suffix(patternComponents).joined(separator: "/")
+                        if matchesPath(path: suffix, pattern: pattern) {
+                            return limit
+                        }
+                    }
+                }
+
+                // Fall back to filename matching
                 if matches(fileName: fileName, pattern: pattern) {
                     return limit
                 }

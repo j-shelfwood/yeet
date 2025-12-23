@@ -14,9 +14,11 @@ import Foundation
 public struct FileProcessor: Sendable {
     private let reader: FileReader
     private let maxTokens: Int
+    private let tokenLimits: [String: Int]?
 
     public init(maxTokens: Int, safetyLimits: SafetyLimits, tokenLimits: [String: Int]? = nil) {
         self.maxTokens = maxTokens
+        self.tokenLimits = tokenLimits
         self.reader = FileReader(
             maxTokens: maxTokens,
             maxFileSize: safetyLimits.maxFileSize,
@@ -72,11 +74,21 @@ public struct FileProcessor: Sendable {
                                 return (index, fileContent)
                             }
 
-                            // Tokenize the file
+                            // Tokenize the file with per-file token limit
                             do {
+                                // Get custom token limit for this file (if configured)
+                                let fileURL = URL(fileURLWithPath: fileContent.path)
+                                let fileName = fileURL.lastPathComponent
+                                let limit = FilePatterns.getTokenLimit(
+                                    for: fileName,
+                                    path: fileContent.path,
+                                    defaultLimit: self.maxTokens,
+                                    customLimits: self.tokenLimits
+                                )
+
                                 let result = try await TruncationStrategy.truncateHeadTail(
                                     fileContent.content,
-                                    limit: self.maxTokens
+                                    limit: limit
                                 )
 
                                 return (index, FileContent(

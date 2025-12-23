@@ -101,11 +101,58 @@ quiet = true
 
 [exclude]
 directories = ["node_modules", "dist", "coverage"]
+patterns = ["public/**", "*.min.*"]
+
+[include]
+patterns = ["*.swift", "*.ts", "*.php"]
 
 [token_limits]
-"*.lock" = 500        # Limit lock files
-"*.min.*" = 0         # Skip minified files
+# Filename-based limits
+"*.lock" = 500                  # Limit lock files
+"*-lock.json" = 400             # Specific lock file pattern
+"*.min.*" = 0                   # Skip minified files (limit=0)
+
+# Path-based limits (supports ** for recursion)
+"database/migrations/**" = 800  # Limit migration files
+"lang/*.json" = 600             # Limit translation files
+"tests/**/*.php" = 1000         # Limit test files
+
+[performance]
+mode = "content-aware"          # Enable per-file token limits
+
+[git]
+include_history = true
+history_mode = "summary"
+history_count = 5
 ```
+
+### Token Limits
+
+Control per-file token budgets with the `[token_limits]` section. Useful for:
+- Large configuration files (lock files, package manifests)
+- Generated code (migrations, mocks)
+- Localization files (translations)
+
+**Filename patterns:**
+```toml
+"*.lock" = 500          # Match by extension
+"package-lock.json" = 400  # Match specific filename
+```
+
+**Path patterns:**
+```toml
+"database/migrations/**" = 800   # Recursive directory matching
+"lang/*.json" = 600               # Single-level wildcard
+"tests/**/*.spec.ts" = 1000      # Combined pattern
+```
+
+**Special value:**
+- `limit = 0` - Skip file entirely (useful for excluding without removing from git)
+
+**Notes:**
+- Requires `--stats` flag to see per-file token counts
+- Path patterns are checked before filename patterns
+- Paths are relative to repository/scan root
 
 For complete reference, see:
 - [CONFIGURATION.md](CONFIGURATION.md) - Full configuration guide

@@ -23,34 +23,29 @@ jobs:
     - name: Build release binary
       run: swift build -c release
 
-    - name: Create archive
-      run: |
-        cd .build/release
-        tar -czf yeet-${{ steps.get_version.outputs.VERSION }}-macos.tar.gz yeet
-        cd ../..
-
     - name: Calculate SHA256
       id: sha256
       run: |
         cd .build/release
-        echo "SHA256=$(shasum -a 256 yeet-${{ steps.get_version.outputs.VERSION }}-macos.tar.gz | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+        echo "SHA256=$(shasum -a 256 yeet | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
         cd ../..
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        files: .build/release/yeet-${{ steps.get_version.outputs.VERSION }}-macos.tar.gz
+        files: .build/release/yeet
         body: |
           ## Installation
 
           ### Homebrew
           ```bash
-          brew install shelfwood/tap/yeet
+          brew install j-shelfwood/tap/yeet
           ```
 
           ### Manual
           ```bash
-          curl -L https://github.com/shelfwood/yeet/releases/download/v${{ steps.get_version.outputs.VERSION }}/yeet-${{ steps.get_version.outputs.VERSION }}-macos.tar.gz | tar xz
+          curl -L https://github.com/j-shelfwood/yeet/releases/download/v${{ steps.get_version.outputs.VERSION }}/yeet -o yeet
+          chmod +x yeet
           mv yeet /usr/local/bin/
           ```
 
@@ -65,7 +60,48 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Update Homebrew Formula
+      env:
+        HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
       run: |
-        echo "Update Formula/yeet.rb with:"
-        echo "  url: https://github.com/shelfwood/yeet/archive/refs/tags/v${{ steps.get_version.outputs.VERSION }}.tar.gz"
-        echo "  sha256: ${{ steps.sha256.outputs.SHA256 }}"
+        # Clone homebrew-tap repository
+        git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/j-shelfwood/homebrew-tap.git /tmp/homebrew-tap
+        cd /tmp/homebrew-tap
+
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        # Update formula
+        cat > Formula/yeet.rb << 'EOF'
+        class Yeet < Formula
+          desc "Package your codebase for AI consumption in seconds"
+          homepage "https://github.com/j-shelfwood/yeet"
+          url "https://github.com/j-shelfwood/yeet/releases/download/v${{ steps.get_version.outputs.VERSION }}/yeet"
+          version "${{ steps.get_version.outputs.VERSION }}"
+          sha256 "${{ steps.sha256.outputs.SHA256 }}"
+          license "MIT"
+
+          depends_on :macos
+          depends_on arch: :arm64
+
+          def install
+            bin.install "yeet"
+          end
+
+          test do
+            # Test basic functionality
+            assert_match "yeet", shell_output("#{bin}/yeet --version")
+
+            # Test help command
+            assert_match "Package source code for LLM consumption", shell_output("#{bin}/yeet --help")
+
+            # Test list-only mode (dry run)
+            system "#{bin}/yeet", "--list-only"
+          end
+        end
+        EOF
+
+        # Commit and push
+        git add Formula/yeet.rb
+        git commit -m "chore: Update yeet formula to v${{ steps.get_version.outputs.VERSION }}"
+        git push origin main

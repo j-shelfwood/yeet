@@ -79,7 +79,10 @@ public struct DirectoryWalker {
             // Only collect files, not directories
             let resourceValues = try? fileURL.resourceValues(forKeys: [.isDirectoryKey])
             if resourceValues?.isDirectory != true {
-                files.append(fileURL)
+                // Apply include pattern filtering
+                if matcher.shouldInclude(fileURL) {
+                    files.append(fileURL)
+                }
             }
         }
 

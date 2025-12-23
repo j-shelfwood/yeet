@@ -44,8 +44,13 @@ public struct FileReader: Sendable {
             )
         }
 
-        // Skip minified files based on filename pattern (check both custom and default patterns)
-        if FilePatterns.getTokenLimit(for: fileName, defaultLimit: 1, customLimits: tokenLimits) == 0 {
+        // Skip files with token limit = 0 (based on filename or path pattern)
+        if FilePatterns.getTokenLimit(
+            for: fileName,
+            path: url.path,
+            defaultLimit: 1,
+            customLimits: tokenLimits
+        ) == 0 {
             return FileContent(
                 path: url.path,
                 content: "[SKIPPED - Pattern-excluded file]",

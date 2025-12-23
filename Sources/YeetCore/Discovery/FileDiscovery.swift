@@ -27,10 +27,27 @@ public struct FileDiscovery {
     /// - Throws: YeetError if safety limits exceeded or operations fail
     public func discoverFiles() throws -> [URL] {
         // Try git-aware discovery first
-        if let gitRepo = GitRepository.find(for: configuration.paths.first ?? ".") {
-            let files = try gitDiscovery.discoverFiles(gitRepo: gitRepo)
-            try checkSafetyLimit(fileCount: files.count)
-            return files
+        let firstPath = configuration.paths.first ?? "."
+
+        if let gitRepo = GitRepository.find(for: firstPath) {
+            // Only use git discovery if one of the scan paths is within or is the git repo
+            // This prevents using parent repo git when scanning a subdirectory without .git
+            let absolutePath: String
+            if firstPath.hasPrefix("/") {
+                absolutePath = firstPath
+            } else {
+                absolutePath = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                    .appendingPathComponent(firstPath)
+                    .standardizedFileURL
+                    .path
+            }
+
+            // Check if scan path is within the git repo (or is the git repo)
+            if absolutePath.hasPrefix(gitRepo.rootPath) || gitRepo.rootPath.hasPrefix(absolutePath) {
+                let files = try gitDiscovery.discoverFiles(gitRepo: gitRepo)
+                try checkSafetyLimit(fileCount: files.count)
+                return files
+            }
         }
 
         // Fall back to regular file system walking

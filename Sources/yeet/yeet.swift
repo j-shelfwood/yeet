@@ -16,7 +16,7 @@ struct Yeet: AsyncParsableCommand {
           • User config: ~/.yeetconfig (personal preferences)
           • See CONFIGURATION.md for complete reference
         """,
-        version: "1.1.0"
+        version: "1.2.0"
     )
 
     // MARK: - Input Sources
@@ -222,6 +222,7 @@ struct Yeet: AsyncParsableCommand {
         )
 
         // Configure collector
+        let effectivePerformanceMode = loadedConfig.performance?.mode ?? "zero-tokenization"
         let config = CollectorConfiguration(
             paths: finalPaths,
             maxTokens: effectiveMaxTokens,
@@ -230,6 +231,7 @@ struct Yeet: AsyncParsableCommand {
             excludePatterns: effectiveExcludePatterns,
             typeFilters: effectiveTypeFilters,
             tokenLimits: loadedConfig.tokenLimits,
+            performanceMode: effectivePerformanceMode,
             diffMode: diff,
             includeHistory: effectiveIncludeHistory,
             historyMode: effectiveHistoryMode,
