@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     name: Build and Release
-    runs-on: macos-latest
+    runs-on: macos-14-xlarge  # arm64 runner required for TiktokenFFI.framework
 
     steps:
     - uses: actions/checkout@v4
