@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.2.0] - 2025-12-23
+
+### Added
+- **Per-file token limit configuration system**
+  - Filename-based patterns: `"*.lock" = 500`, `"package-lock.json" = 400`
+  - Path-based patterns with recursive matching: `"database/migrations/**" = 800`
+  - Combined patterns: `"tests/**/*.spec.ts" = 1000`
+  - Special value: `limit = 0` to skip files entirely
+  - Full documentation in README.md Token Limits section
+- **Performance mode infrastructure**
+  - `[performance]` section in .yeetconfig
+  - `mode = "zero-tokenization"` (default) or `"content-aware"`
+  - Foundation for future optimization features
+- **Automated Homebrew release pipeline**
+  - Formula updates now fully automated on tag push
+  - Eliminates manual SHA256 calculation and cross-repo syncing
+  - 5-10 minute time savings per release
+
+### Fixed
+- **CRITICAL**: Per-file token limits now apply correctly
+  - FileProcessor was ignoring tokenLimits configuration
+  - Token limits always used global maxTokens regardless of patterns
+  - Now properly applies custom limits based on filename/path patterns
+- **Token limit pattern matching enhanced**
+  - Added relative path normalization for accurate matching
+  - Path patterns checked before filename patterns
+  - Suffix matching for flexible pattern resolution
+
+### Tests
+- Added 7 new integration tests (100/100 passing)
+- TokenLimitsTests suite covering:
+  - Filename pattern matching (`*-lock.json`)
+  - Path-based patterns (`database/migrations/**`)
+  - Pattern priority rules
+  - Edge cases and fallback behavior
+
 ## [1.1.0] - 2025-12-23
 
 ### Fixed
