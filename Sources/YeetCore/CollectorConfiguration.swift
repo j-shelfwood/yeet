@@ -79,6 +79,7 @@ public struct CollectorConfiguration {
     public let listOnly: Bool
     public let showTree: Bool
     public let quiet: Bool
+    public let enableTokenCounting: Bool
 
     // MARK: - Advanced
 
@@ -104,6 +105,7 @@ public struct CollectorConfiguration {
         listOnly: Bool = false,
         showTree: Bool = true,
         quiet: Bool = false,
+        enableTokenCounting: Bool = false,
         rootDirectory: String? = nil,
         encodingPath: String? = nil,
         safetyLimits: SafetyLimits = .default
@@ -123,6 +125,7 @@ public struct CollectorConfiguration {
         self.listOnly = listOnly
         self.showTree = showTree
         self.quiet = quiet
+        self.enableTokenCounting = enableTokenCounting
         self.rootDirectory = rootDirectory
         self.encodingPath = encodingPath
         self.safetyLimits = safetyLimits

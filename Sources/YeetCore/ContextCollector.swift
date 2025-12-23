@@ -90,9 +90,9 @@ public class ContextCollector {
 
         progress("Found \(fileURLs.count) files")
 
-        // Step 2: Read and process files in parallel (NO TOKENIZATION YET)
+        // Step 2: Read and process files in parallel
         progress("Reading files...")
-        let fileContents = try await processor.processFiles(fileURLs)
+        let fileContents = try await processor.processFiles(fileURLs, enableTokenCounting: configuration.enableTokenCounting)
 
         progress("Processed \(fileContents.count) files")
 

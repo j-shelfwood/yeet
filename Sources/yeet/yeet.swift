@@ -238,6 +238,7 @@ struct Yeet: AsyncParsableCommand {
             listOnly: listOnly,
             showTree: effectiveShowTree,
             quiet: effectiveQuiet,
+            enableTokenCounting: stats,  // Enable per-file token counting for stats
             rootDirectory: root,
             encodingPath: encodingPath,
             safetyLimits: safetyLimits

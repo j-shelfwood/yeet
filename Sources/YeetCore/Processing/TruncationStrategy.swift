@@ -3,6 +3,14 @@ import Foundation
 /// File truncation strategies for token limit enforcement
 public struct TruncationStrategy {
 
+    /// Result of truncation operation
+    public struct TruncationResult {
+        public let content: String
+        public let tokenCount: Int
+        public let originalTokenCount: Int
+        public let wasTruncated: Bool
+    }
+
     /// Truncate content using head + tail strategy (TOKEN-BASED - ZERO LINE-BY-LINE FFI)
     ///
     /// Preserves beginning and end of file for better context.
@@ -11,7 +19,7 @@ public struct TruncationStrategy {
     /// - Parameters:
     ///   - content: Original file content
     ///   - limit: Maximum token count
-    /// - Returns: Truncated content with marker
+    /// - Returns: Truncation result with content and token counts
     ///
     /// ## Strategy
     ///
@@ -31,13 +39,19 @@ public struct TruncationStrategy {
     /// **New approach:** Any file = 3 FFI calls (encode, decode head, decode tail)
     ///
     /// This eliminates "FFI Marshaling Death" - the primary performance bottleneck.
-    public static func truncateHeadTail(_ content: String, limit: Int) async throws -> String {
+    public static func truncateHeadTail(_ content: String, limit: Int) async throws -> TruncationResult {
         // SINGLE FFI CALL: Encode entire file to tokens
         let allTokens = try await Tokenizer.shared.encode(text: content)
+        let originalTokenCount = allTokens.count
 
         // Fast path: Already under limit
         if allTokens.count <= limit {
-            return content
+            return TruncationResult(
+                content: content,
+                tokenCount: originalTokenCount,
+                originalTokenCount: originalTokenCount,
+                wasTruncated: false
+            )
         }
 
         // 75% tokens from head, 25% from tail
@@ -57,7 +71,14 @@ public struct TruncationStrategy {
         let truncationMarker = "\n\n[... TRUNCATED - \(omittedTokens) tokens omitted ...]\n\n"
 
         // Combine head + marker + tail
-        return headText + truncationMarker + tailText
+        let truncatedContent = headText + truncationMarker + tailText
+
+        return TruncationResult(
+            content: truncatedContent,
+            tokenCount: headTokens.count + tailTokens.count,
+            originalTokenCount: originalTokenCount,
+            wasTruncated: true
+        )
     }
 
     /// Truncate content using head-only strategy (TOKEN-BASED - ZERO LINE-BY-LINE FFI)
@@ -67,25 +88,38 @@ public struct TruncationStrategy {
     /// - Parameters:
     ///   - content: Original file content
     ///   - limit: Maximum token count
-    /// - Returns: Truncated content
+    /// - Returns: Truncation result with content and token counts
     ///
     /// ## Performance Optimization
     ///
     /// **Old approach:** N lines = N FFI calls
     /// **New approach:** 2 FFI calls (encode once, decode once)
-    public static func truncateHeadOnly(_ content: String, limit: Int) async throws -> String {
+    public static func truncateHeadOnly(_ content: String, limit: Int) async throws -> TruncationResult {
         // SINGLE FFI CALL: Encode entire file
         let allTokens = try await Tokenizer.shared.encode(text: content)
+        let originalTokenCount = allTokens.count
 
         // Fast path: Already under limit
         if allTokens.count <= limit {
-            return content
+            return TruncationResult(
+                content: content,
+                tokenCount: originalTokenCount,
+                originalTokenCount: originalTokenCount,
+                wasTruncated: false
+            )
         }
 
         // PURE ARRAY SLICING (no FFI)
         let headTokens = Array(allTokens.prefix(limit))
 
         // SINGLE FFI CALL: Decode head
-        return try await Tokenizer.shared.decode(tokens: headTokens)
+        let truncatedContent = try await Tokenizer.shared.decode(tokens: headTokens)
+
+        return TruncationResult(
+            content: truncatedContent,
+            tokenCount: headTokens.count,
+            originalTokenCount: originalTokenCount,
+            wasTruncated: true
+        )
     }
 }
