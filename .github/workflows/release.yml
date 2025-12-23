@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     name: Build and Release
-    runs-on: macos-14-xlarge  # arm64 runner required for TiktokenFFI.framework
+    runs-on: macos-latest  # Use latest macOS with Swift 6.1
 
     steps:
     - uses: actions/checkout@v4
@@ -79,7 +79,6 @@ jobs:
           license "MIT"
 
           depends_on :macos
-          depends_on arch: :arm64
 
           def install
             bin.install "yeet"
