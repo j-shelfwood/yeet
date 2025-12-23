@@ -17,8 +17,21 @@ jobs:
       id: get_version
       run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+    - name: Debug framework before build
+      run: |
+        echo "=== Checking source framework ==="
+        file Frameworks/TiktokenFFI.xcframework/macos-arm64_x86_64/TiktokenFFI.framework/TiktokenFFI
+        lipo -info Frameworks/TiktokenFFI.xcframework/macos-arm64_x86_64/TiktokenFFI.framework/TiktokenFFI
+
     - name: Build release binary
-      run: swift build -c release
+      run: swift build -c release -v 2>&1 | tail -100 || true
+
+    - name: Debug framework after failed build
+      if: failure()
+      run: |
+        echo "=== Checking copied framework ==="
+        find .build -name "TiktokenFFI" -type f -exec file {} \;
+        find .build -name "TiktokenFFI" -type f -exec lipo -info {} \;
 
     - name: Calculate SHA256
       id: sha256
