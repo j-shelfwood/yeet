@@ -5,12 +5,14 @@ public struct CollectionResult {
     public let fileCount: Int
     public let totalTokens: Int
     public let fileList: String
+    public let files: [FileContent]
     private let output: String
 
-    public init(fileCount: Int, totalTokens: Int, fileList: String, output: String) {
+    public init(fileCount: Int, totalTokens: Int, fileList: String, files: [FileContent], output: String) {
         self.fileCount = fileCount
         self.totalTokens = totalTokens
         self.fileList = fileList
+        self.files = files
         self.output = output
     }
 

@@ -123,6 +123,18 @@ struct Yeet: AsyncParsableCommand {
     )
     var benchmark: Bool = false
 
+    @Flag(
+        name: .long,
+        help: "Show per-file token statistics"
+    )
+    var stats: Bool = false
+
+    @Flag(
+        name: .long,
+        help: "Group statistics by directory (requires --stats)"
+    )
+    var statsByDir: Bool = false
+
     // MARK: - Advanced Options
 
     @Option(
@@ -246,6 +258,23 @@ struct Yeet: AsyncParsableCommand {
                 print("✓ Context copied to clipboard!")
                 print("  Files: \(result.fileCount)")
                 print("  Tokens: \(result.totalTokens)")
+            }
+
+            // Show statistics if requested
+            if stats {
+                // Enhanced summary
+                print(TextFormatter.formatEnhancedSummary(
+                    files: result.files,
+                    totalTokens: result.totalTokens,
+                    budget: effectiveMaxTotalTokens
+                ))
+
+                // Per-file or per-directory stats
+                if statsByDir {
+                    print(TextFormatter.formatStatsByDirectory(files: result.files))
+                } else {
+                    print(TextFormatter.formatStats(files: result.files, showAll: false))
+                }
             }
         }
     }

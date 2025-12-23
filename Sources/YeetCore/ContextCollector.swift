@@ -83,6 +83,7 @@ public class ContextCollector {
                 fileCount: 0,
                 totalTokens: 0,
                 fileList: "No files found matching criteria",
+                files: [],
                 output: "No files found matching criteria\n"
             )
         }
@@ -151,6 +152,7 @@ public class ContextCollector {
             fileCount: fileContents.count,
             totalTokens: totalTokens,
             fileList: fileList,
+            files: fileContents,
             output: output
         )
     }
