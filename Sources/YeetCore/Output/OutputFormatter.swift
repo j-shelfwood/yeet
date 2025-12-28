@@ -49,6 +49,40 @@ public struct OutputFormatter {
         return output
     }
 
+    /// Format file contents WITHOUT summary (for token counting)
+    ///
+    /// Assembles text output including optional tree, file contents,
+    /// and git history, but excludes the summary section. This allows
+    /// counting tokens of the content before generating the summary.
+    ///
+    /// - Parameters:
+    ///   - files: Array of file contents to format
+    ///   - gitHistory: Optional git commit history
+    /// - Returns: Formatted text output without summary
+    public func formatTextWithoutSummary(
+        files: [FileContent],
+        gitHistory: [Commit]? = nil
+    ) -> String {
+        var output = ""
+
+        // Directory tree (if enabled)
+        if configuration.showTree {
+            output += TreeGenerator.generate(for: files)
+            output += "\n"
+        }
+
+        // File contents
+        output += TextFormatter.formatFileContents(files: files)
+
+        // Git history
+        if let history = gitHistory, !history.isEmpty {
+            output += "\n"
+            output += HistoryFormatter.format(history)
+        }
+
+        return output
+    }
+
     /// Format file contents as JSON output
     ///
     /// - Parameters:

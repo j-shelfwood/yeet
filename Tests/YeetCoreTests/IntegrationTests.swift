@@ -566,4 +566,36 @@ final class IntegrationTests: XCTestCase {
         XCTAssertEqual(config.historyMode, "full", "Should use full history mode")
         XCTAssertEqual(config.historyCount, 3, "Should limit to 3 commits")
     }
+
+    // MARK: - Output Validation Tests
+
+    func testSummaryDisplaysCorrectTokenCount() async throws {
+        // Create test file with known content (use .swift to match default patterns)
+        let testContent = "// Hello world! This is a test file with some content.\nlet foo = \"bar\""
+        let file = tempDir.appendingPathComponent("test.swift")
+        try testContent.write(to: file, atomically: true, encoding: .utf8)
+
+        let config = CollectorConfiguration(
+            paths: [tempDir.path],
+            includePatterns: ["*.swift"]
+        )
+        let collector = ContextCollector(configuration: config)
+        let result = try await collector.collect()
+
+        // CRITICAL: Verify output contains correct token count
+        let expectedSummary = "Total tokens (approx): \(result.totalTokens)"
+        XCTAssertTrue(
+            result.output.contains(expectedSummary),
+            "Summary should display actual token count \(result.totalTokens), not 0. Output: \(result.output.suffix(200))"
+        )
+
+        // Verify it's NOT showing 0 (regression test for bug in v1.2.0)
+        XCTAssertFalse(
+            result.output.contains("Total tokens (approx): 0"),
+            "Summary should never show 0 tokens when files are collected"
+        )
+
+        // Verify tokens are reasonable (not 0)
+        XCTAssertGreaterThan(result.totalTokens, 0, "Token count should be greater than 0")
+    }
 }

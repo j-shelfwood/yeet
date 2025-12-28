@@ -1,5 +1,36 @@
 # Changelog
 
+## [1.2.1] - 2025-12-28
+
+### Fixed
+- **CRITICAL**: Summary token count displaying 0 instead of actual value
+  - ContextCollector.swift:131 passed hardcoded `totalTokens: 0` to formatter
+  - Zero-tokenization optimization calculated tokens AFTER formatting output
+  - Output string never updated with correct token count
+  - Summary now correctly displays actual token count (e.g., 457923 instead of 0)
+  - Added regression test: testSummaryDisplaysCorrectTokenCount()
+  - Added 6 unit tests for TextFormatter output validation
+- **CRITICAL**: --stats-by-dir segmentation fault (affects 100% of users attempting feature)
+  - TextFormatter.swift:216 used `%-30s` format with Swift String (expects C string pointer)
+  - TextFormatter.swift:94 used `%s` format with Swift String in budget display
+  - Both instances replaced with `%@` format specifier and manual padding
+  - Feature now fully operational without crashes
+- **Directory grouping logic enhanced**
+  - Added common path prefix detection for meaningful directory grouping
+  - Previously grouped all files under "Users/" for absolute paths
+  - Now correctly groups by project directories (app/, domain/, Infrastructure/, etc.)
+  - Shows accurate token distribution across actual codebase structure
+
+### Technical Details
+- Token count fix: Split summary generation - format content → count → append summary
+- Added OutputFormatter.formatTextWithoutSummary() for content-only formatting
+- Made CollectionResult.output public for test verification
+- Root cause (segfault): Swift String.format() delegates to NSString/CoreFoundation
+- Format specifier %s expects UnsafePointer<Int8> (C string), not Swift String
+- Passing Swift String to %s causes SIGSEGV (Segmentation fault: 11)
+- Fix: Use %@ for Swift String objects with manual padding via String.padding()
+- Added findCommonPathPrefix() helper for relative path extraction
+
 ## [1.2.0] - 2025-12-23
 
 ### Added

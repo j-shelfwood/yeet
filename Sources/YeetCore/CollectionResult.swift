@@ -6,7 +6,7 @@ public struct CollectionResult {
     public let totalTokens: Int
     public let fileList: String
     public let files: [FileContent]
-    private let output: String
+    public let output: String
 
     public init(fileCount: Int, totalTokens: Int, fileList: String, files: [FileContent], output: String) {
         self.fileCount = fileCount

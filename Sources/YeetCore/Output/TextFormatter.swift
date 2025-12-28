@@ -91,12 +91,13 @@ public struct TextFormatter {
         if let budget = budget {
             let percentage = Double(totalTokens) / Double(budget) * 100
             let budgetStatus = totalTokens <= budget ? "✓" : "⚠️"
-            summary += String(format: "║ Token Usage          %d / %d (%.1f%%) %@ %s║\n",
+            let padding = String(repeating: " ", count: max(0, 30 - "\(totalTokens)".count - "\(budget)".count))
+            summary += String(format: "║ Token Usage          %d / %d (%.1f%%) %@ %@║\n",
                             totalTokens,
                             budget,
                             percentage,
                             budgetStatus,
-                            String(repeating: " ", count: max(0, 30 - "\(totalTokens)".count - "\(budget)".count)))
+                            padding)
         } else {
             summary += String(format: "║ Token Usage          %-55d ║\n", totalTokens)
         }
@@ -185,11 +186,23 @@ public struct TextFormatter {
         output += "\nToken Distribution by Directory:\n"
         output += String(repeating: "━", count: 80) + "\n"
 
+        // Find common path prefix to extract relative paths
+        let commonPrefix = findCommonPathPrefix(paths: files.map { $0.path })
+
         // Aggregate by top-level directory
         var dirStats: [String: (files: Int, tokens: Int, truncated: Int)] = [:]
 
         for file in files {
-            let components = file.path.split(separator: "/")
+            // Extract relative path from common prefix
+            var relativePath = file.path
+            if !commonPrefix.isEmpty && file.path.hasPrefix(commonPrefix) {
+                relativePath = String(file.path.dropFirst(commonPrefix.count))
+                if relativePath.hasPrefix("/") {
+                    relativePath = String(relativePath.dropFirst())
+                }
+            }
+
+            let components = relativePath.split(separator: "/")
             let topDir = components.isEmpty ? "." : String(components[0])
 
             if dirStats[topDir] == nil {
@@ -212,11 +225,12 @@ public struct TextFormatter {
         for (dir, stats) in sorted {
             let percentage = totalTokens > 0 ? Double(stats.tokens) / Double(totalTokens) * 100 : 0
             let truncInfo = stats.truncated > 0 ? " (\(stats.truncated) truncated)" : ""
+            let paddedDir = (dir + "/").padding(toLength: 30, withPad: " ", startingAt: 0)
 
-            output += String(format: "%8d tokens (%5.1f%%)  %-30s  %d files%@\n",
+            output += String(format: "%8d tokens (%5.1f%%)  %@  %d files%@\n",
                            stats.tokens,
                            percentage,
-                           dir + "/",
+                           paddedDir,
                            stats.files,
                            truncInfo)
         }
@@ -227,5 +241,36 @@ public struct TextFormatter {
                         dirStats.count)
 
         return output
+    }
+
+    /// Find common path prefix for a list of paths
+    private static func findCommonPathPrefix(paths: [String]) -> String {
+        guard !paths.isEmpty else { return "" }
+        guard paths.count > 1 else { return "" }
+
+        // Split all paths into components
+        let allComponents = paths.map { $0.split(separator: "/").map(String.init) }
+
+        // Find shortest path length
+        guard let minLength = allComponents.map({ $0.count }).min() else { return "" }
+
+        // Find common prefix components
+        var commonComponents: [String] = []
+        for i in 0..<minLength {
+            let component = allComponents[0][i]
+            if allComponents.allSatisfy({ $0[i] == component }) {
+                commonComponents.append(component)
+            } else {
+                break
+            }
+        }
+
+        // Reconstruct path from components
+        if commonComponents.isEmpty {
+            return ""
+        }
+
+        let prefix = "/" + commonComponents.joined(separator: "/")
+        return prefix
     }
 }

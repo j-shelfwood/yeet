@@ -113,34 +113,44 @@ public class ContextCollector {
             }
         }
 
-        // Step 4: Format output (still no tokenization)
+        // Step 4: Format output and count tokens
         let output: String
         let fileList: String
+        let totalTokens: Int
 
         if configuration.listOnly {
             fileList = formatter.formatFileList(files: fileContents)
             output = fileList
+            totalTokens = 0
         } else {
             if configuration.outputJSON {
-                // For JSON, format without token count first
-                output = formatter.formatJSON(files: fileContents, totalTokens: 0)
+                // For JSON: format without token count, count, then regenerate with correct count
+                let contentOnly = formatter.formatJSON(files: fileContents, totalTokens: 0)
+                progress("Counting tokens...")
+                totalTokens = try await Tokenizer.shared.count(text: contentOnly)
+
+                // Regenerate JSON with correct token count
+                output = formatter.formatJSON(files: fileContents, totalTokens: totalTokens)
             } else {
-                // For text, format without token count first
-                output = formatter.formatText(
+                // For text: format content without summary, count, then append summary with correct count
+                progress("Counting tokens...")
+                let contentOnly = formatter.formatTextWithoutSummary(
                     files: fileContents,
-                    totalTokens: 0,
                     gitHistory: gitHistory
+                )
+                totalTokens = try await Tokenizer.shared.count(text: contentOnly)
+
+                // Append summary with correct token count
+                output = contentOnly + TextFormatter.formatSummary(
+                    fileCount: fileContents.count,
+                    totalTokens: totalTokens
                 )
             }
 
             fileList = formatter.formatFileList(files: fileContents)
         }
 
-        // Step 5: SINGLE TOKENIZATION of final output (THE ONLY FFI CALL)
-        progress("Counting tokens...")
-        let totalTokens = try await Tokenizer.shared.count(text: output)
-
-        // Step 6: Verify total tokens within safety limit
+        // Step 5: Verify total tokens within safety limit
         if totalTokens > configuration.safetyLimits.maxTotalTokens {
             throw YeetError.tooManyTokens(
                 total: totalTokens,
