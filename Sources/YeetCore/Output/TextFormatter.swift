@@ -273,4 +273,223 @@ public struct TextFormatter {
         let prefix = "/" + commonComponents.joined(separator: "/")
         return prefix
     }
+
+    // MARK: - Enhanced CLI Output
+
+    /// Format enhanced CLI output with visual statistics
+    public static func formatEnhancedCLIOutput(
+        files: [FileContent],
+        totalTokens: Int,
+        budget: Int,
+        listOnly: Bool
+    ) -> String {
+        var output = ""
+
+        // Header
+        output += "\n"
+        if listOnly {
+            output += "📋 File List Preview\n"
+        } else {
+            output += "✓ Context copied to clipboard!\n"
+        }
+        output += String(repeating: "─", count: 60) + "\n\n"
+
+        // Token budget visualization
+        let percentage = Double(totalTokens) / Double(budget) * 100
+        let barWidth = 40
+        let filledWidth = min(Int(Double(barWidth) * percentage / 100.0), barWidth)
+        let bar = String(repeating: "█", count: filledWidth) + String(repeating: "░", count: barWidth - filledWidth)
+
+        let budgetStatus = totalTokens <= budget ? "✓" : "⚠️"
+        output += String(format: "Tokens:  %@ %@ %.1f%%\n", bar, budgetStatus, percentage)
+        output += String(format: "         %@ / %@ tokens\n\n",
+                        formatNumber(totalTokens),
+                        formatNumber(budget))
+
+        // File and truncation stats
+        let truncatedCount = files.filter { $0.wasTruncated }.count
+        output += String(format: "Files:   %d collected", files.count)
+        if truncatedCount > 0 {
+            let truncatedPercent = Double(truncatedCount) / Double(files.count) * 100
+            output += String(format: " (%d truncated, %.1f%%)", truncatedCount, truncatedPercent)
+        }
+        output += "\n\n"
+
+        // Directory breakdown with spark bars
+        if !files.isEmpty {
+            output += formatDirectoryBreakdown(files: files, totalTokens: totalTokens)
+            output += "\n"
+        }
+
+        // Top 5 largest files
+        if !files.isEmpty {
+            output += formatTopFiles(files: files, count: 5)
+            output += "\n"
+        }
+
+        // Truncation savings
+        if truncatedCount > 0 {
+            let originalTokens = files.reduce(0) { $0 + $1.originalTokenCount }
+            let fileTokens = files.reduce(0) { $0 + $1.tokenCount }
+            let saved = originalTokens - fileTokens
+            output += String(format: "💾 Saved %@ tokens through truncation (%.1f%%)\n",
+                           formatNumber(saved),
+                           Double(saved) / Double(originalTokens) * 100)
+        }
+
+        return output
+    }
+
+    /// Format directory breakdown with spark bars
+    private static func formatDirectoryBreakdown(files: [FileContent], totalTokens: Int) -> String {
+        var output = ""
+        output += "📁 Token Distribution\n"
+        output += String(repeating: "─", count: 60) + "\n"
+
+        // Calculate total file tokens (excluding git history/summary)
+        let fileTokenSum = files.reduce(0) { $0 + $1.tokenCount }
+
+        // Special case: single file - show filename
+        if files.count == 1 {
+            let file = files[0]
+            let filename = (file.path as NSString).lastPathComponent
+            let sparkBar = createSparkBar(value: file.tokenCount, max: file.tokenCount)
+            let displayName = filename.padding(toLength: 35, withPad: " ", startingAt: 0)
+            output += String(format: "%@ %@ %2d files • %@ tokens • 100.0%%\n",
+                           displayName,
+                           sparkBar,
+                           1,
+                           formatNumber(file.tokenCount))
+            return output
+        }
+
+        // Find common path prefix
+        let commonPrefix = findCommonPathPrefix(paths: files.map { $0.path })
+
+        // Aggregate by top-level directory
+        var dirStats: [String: (files: Int, tokens: Int, isDirectory: Bool)] = [:]
+
+        for file in files {
+            var relativePath = file.path
+            if !commonPrefix.isEmpty && file.path.hasPrefix(commonPrefix) {
+                relativePath = String(file.path.dropFirst(commonPrefix.count))
+                if relativePath.hasPrefix("/") {
+                    relativePath = String(relativePath.dropFirst())
+                }
+            }
+
+            let components = relativePath.split(separator: "/")
+
+            // For files in root, use filename; otherwise use first directory
+            let topDir: String
+            if components.isEmpty {
+                topDir = (file.path as NSString).lastPathComponent
+            } else if components.count == 1 {
+                // Single component - it's the filename itself
+                topDir = String(components[0])
+            } else {
+                // Multiple components - use first directory
+                topDir = String(components[0])
+            }
+
+            if dirStats[topDir] == nil {
+                dirStats[topDir] = (files: 0, tokens: 0, isDirectory: components.count > 1)
+            }
+
+            dirStats[topDir]!.files += 1
+            dirStats[topDir]!.tokens += file.tokenCount
+        }
+
+        // Sort by token count and take top 10
+        let sorted = dirStats.sorted { $0.value.tokens > $1.value.tokens }.prefix(10)
+        let maxTokens = sorted.first?.value.tokens ?? 1
+
+        for (dir, stats) in sorted {
+            // Calculate percentage based on file tokens, not total output tokens
+            let percentage = fileTokenSum > 0 ? Double(stats.tokens) / Double(fileTokenSum) * 100 : 0
+
+            // Spark bar (scaled relative to max in this list)
+            let sparkBar = createSparkBar(value: stats.tokens, max: maxTokens)
+
+            // Format directory name with padding (add / suffix only for actual directories)
+            let suffix = stats.isDirectory ? "/" : ""
+            let dirName = (dir + suffix).padding(toLength: 35, withPad: " ", startingAt: 0)
+
+            output += String(format: "%@ %@ %2d files • %@ tokens • %.1f%%\n",
+                           dirName,
+                           sparkBar,
+                           stats.files,
+                           formatNumber(stats.tokens),
+                           percentage)
+        }
+
+        if dirStats.count > 10 {
+            output += String(format: "   ... %d more directories\n", dirStats.count - 10)
+        }
+
+        return output
+    }
+
+    /// Format top N files by token count
+    private static func formatTopFiles(files: [FileContent], count: Int) -> String {
+        var output = ""
+        output += "🔝 Largest Files\n"
+        output += String(repeating: "─", count: 60) + "\n"
+
+        let sorted = files.sorted { $0.tokenCount > $1.tokenCount }.prefix(count)
+        let maxTokens = sorted.first?.tokenCount ?? 1
+
+        for file in sorted {
+            let truncatedMark = file.wasTruncated ? " [T]" : ""
+
+            // Spark bar
+            let sparkBar = createSparkBar(value: file.tokenCount, max: maxTokens)
+
+            // Extract filename from path
+            let filename = (file.path as NSString).lastPathComponent
+            let displayName = filename.padding(toLength: 35, withPad: " ", startingAt: 0)
+
+            output += String(format: "%@ %@ %@%@\n",
+                           displayName,
+                           sparkBar,
+                           formatNumber(file.tokenCount),
+                           truncatedMark)
+        }
+
+        return output
+    }
+
+    /// Create spark bar for visualization
+    private static func createSparkBar(value: Int, max: Int) -> String {
+        let blocks = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
+        let barLength = 8
+
+        var bar = ""
+        for i in 0..<barLength {
+            let threshold = Double(i + 1) / Double(barLength)
+            let valueRatio = Double(value) / Double(max)
+
+            if valueRatio >= threshold {
+                bar += blocks[7]
+            } else if valueRatio >= threshold - (1.0 / Double(barLength)) {
+                let subIndex = Int((valueRatio - (threshold - (1.0 / Double(barLength)))) * Double(barLength) * 8)
+                bar += blocks[min(subIndex, 7)]
+            } else {
+                bar += blocks[0]
+            }
+        }
+
+        return bar
+    }
+
+    /// Format number with k/M suffixes for readability
+    private static func formatNumber(_ number: Int) -> String {
+        if number >= 1_000_000 {
+            return String(format: "%.1fM", Double(number) / 1_000_000.0)
+        } else if number >= 1_000 {
+            return String(format: "%.1fk", Double(number) / 1_000.0)
+        } else {
+            return String(number)
+        }
+    }
 }

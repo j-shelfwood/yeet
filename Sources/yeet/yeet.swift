@@ -16,7 +16,7 @@ struct Yeet: AsyncParsableCommand {
           • User config: ~/.yeetconfig (personal preferences)
           • See CONFIGURATION.md for complete reference
         """,
-        version: "1.2.1"
+        version: "1.3.0"
     )
 
     // MARK: - Input Sources
@@ -123,18 +123,6 @@ struct Yeet: AsyncParsableCommand {
     )
     var benchmark: Bool = false
 
-    @Flag(
-        name: .long,
-        help: "Show per-file token statistics"
-    )
-    var stats: Bool = false
-
-    @Flag(
-        name: .long,
-        help: "Group statistics by directory (requires --stats)"
-    )
-    var statsByDir: Bool = false
-
     // MARK: - Advanced Options
 
     @Option(
@@ -240,7 +228,7 @@ struct Yeet: AsyncParsableCommand {
             listOnly: listOnly,
             showTree: effectiveShowTree,
             quiet: effectiveQuiet,
-            enableTokenCounting: stats,  // Enable per-file token counting for stats
+            enableTokenCounting: true,  // Always enable per-file token counting for statistics
             rootDirectory: root,
             encodingPath: encodingPath,
             safetyLimits: safetyLimits
@@ -254,31 +242,18 @@ struct Yeet: AsyncParsableCommand {
         } else {
             let result = try await collector.collect()
 
-            if listOnly {
-                print(result.fileList)
-            } else {
+            // Copy to clipboard if not list-only mode
+            if !listOnly {
                 try result.copyToClipboard()
-                print("✓ Context copied to clipboard!")
-                print("  Files: \(result.fileCount)")
-                print("  Tokens: \(result.totalTokens)")
             }
 
-            // Show statistics if requested
-            if stats {
-                // Enhanced summary
-                print(TextFormatter.formatEnhancedSummary(
-                    files: result.files,
-                    totalTokens: result.totalTokens,
-                    budget: effectiveMaxTotalTokens
-                ))
-
-                // Per-file or per-directory stats
-                if statsByDir {
-                    print(TextFormatter.formatStatsByDirectory(files: result.files))
-                } else {
-                    print(TextFormatter.formatStats(files: result.files, showAll: false))
-                }
-            }
+            // Always show enhanced statistics with visual elements
+            print(TextFormatter.formatEnhancedCLIOutput(
+                files: result.files,
+                totalTokens: result.totalTokens,
+                budget: effectiveMaxTotalTokens,
+                listOnly: listOnly
+            ))
         }
     }
 
