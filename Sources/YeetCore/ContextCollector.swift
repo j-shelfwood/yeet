@@ -132,19 +132,14 @@ public class ContextCollector {
                 // Regenerate JSON with correct token count
                 output = formatter.formatJSON(files: fileContents, totalTokens: totalTokens)
             } else {
-                // For text: format content without summary, count, then append summary with correct count
+                // For XML: clean, token-efficient format for clipboard
                 progress("Counting tokens...")
-                let contentOnly = formatter.formatTextWithoutSummary(
+                let xmlOutput = formatter.formatXML(
                     files: fileContents,
                     gitHistory: gitHistory
                 )
-                totalTokens = try await Tokenizer.shared.count(text: contentOnly)
-
-                // Append summary with correct token count
-                output = contentOnly + TextFormatter.formatSummary(
-                    fileCount: fileContents.count,
-                    totalTokens: totalTokens
-                )
+                totalTokens = try await Tokenizer.shared.count(text: xmlOutput)
+                output = xmlOutput
             }
 
             fileList = formatter.formatFileList(files: fileContents)

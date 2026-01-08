@@ -19,6 +19,10 @@ let package = Package(
             url: "https://github.com/LebJe/TOMLKit.git",
             from: "0.5.0"
         ),
+        .package(
+            url: "https://github.com/jkrukowski/swift-sentencepiece",
+            from: "0.0.3"
+        ),
     ],
     targets: [
         // Rust-backed TiktokenFFI binary framework
@@ -43,12 +47,15 @@ let package = Package(
         ),
 
         // Library target (contains business logic)
+        // Uses SentencePiece for Gemini-compatible tokenization
+        // Run scripts/download-tokenizer.sh to enable exact token counting
         .target(
             name: "YeetCore",
             dependencies: [
-                "TiktokenSwift",
                 .product(name: "TOMLKit", package: "TOMLKit"),
-            ]
+                .product(name: "SentencepieceTokenizer", package: "swift-sentencepiece"),
+            ],
+            exclude: ["Resources/README.md"]
         ),
 
         // Tests

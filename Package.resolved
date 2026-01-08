@@ -1,5 +1,5 @@
 {
-  "originHash" : "87f7bba405f9e5385cb104437efde3f29cd40a9024e549afc2d3a6fe5f709130",
+  "originHash" : "7525b3c44a29b3ace2eb34d1875620f36e1ca9920159db153e9f161860e4fd13",
   "pins" : [
     {
       "identity" : "swift-argument-parser",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "cdd0ef3755280949551dc26dee5de9ddeda89f54",
         "version" : "1.6.2"
+      }
+    },
+    {
+      "identity" : "swift-sentencepiece",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/jkrukowski/swift-sentencepiece",
+      "state" : {
+        "revision" : "36a8b2b45733f6adb3092100f16e4c7d38a10a7c",
+        "version" : "0.0.6"
       }
     },
     {

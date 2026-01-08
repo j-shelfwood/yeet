@@ -108,4 +108,28 @@ public struct OutputFormatter {
     public func generateTree(for files: [FileContent]) -> String {
         TreeGenerator.generate(for: files)
     }
+
+    /// Format file contents as XML output (for clipboard)
+    ///
+    /// Produces clean, token-efficient XML with semantic markup.
+    /// No decorative separators - just structured content.
+    ///
+    /// - Parameters:
+    ///   - files: Array of file contents to format
+    ///   - gitHistory: Optional git commit history
+    /// - Returns: XML-formatted string for clipboard
+    public func formatXML(
+        files: [FileContent],
+        gitHistory: [Commit]? = nil
+    ) -> String {
+        let tree: String? = configuration.showTree
+            ? TreeGenerator.generateMinimal(for: files)
+            : nil
+
+        return XMLFormatter.format(
+            files: files,
+            tree: tree,
+            gitHistory: gitHistory
+        )
+    }
 }

@@ -63,4 +63,44 @@ public struct TreeGenerator {
         tree += String(repeating: "-", count: 60) + "\n"
         return tree
     }
+
+    /// Generate minimal tree structure for XML output (no decorative separators)
+    ///
+    /// - Parameter files: Array of file contents to visualize
+    /// - Returns: Clean tree structure without separators
+    public static func generateMinimal(for files: [FileContent]) -> String {
+        guard !files.isEmpty else {
+            return ""
+        }
+
+        var tree = ""
+        let paths = files.map { $0.path }.sorted()
+        var lastComponents: [String] = []
+
+        for path in paths {
+            let components = path.split(separator: "/").map(String.init)
+
+            // Find common prefix with previous path
+            var commonPrefix = 0
+            for (i, component) in components.enumerated() {
+                if i < lastComponents.count && lastComponents[i] == component {
+                    commonPrefix += 1
+                } else {
+                    break
+                }
+            }
+
+            // Print new components (those not in common prefix)
+            for (i, component) in components.enumerated() {
+                if i >= commonPrefix {
+                    let indent = String(repeating: "  ", count: i)
+                    tree += indent + component + "\n"
+                }
+            }
+
+            lastComponents = components
+        }
+
+        return tree
+    }
 }

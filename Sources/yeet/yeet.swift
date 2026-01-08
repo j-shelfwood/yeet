@@ -16,7 +16,7 @@ struct Yeet: AsyncParsableCommand {
           • User config: ~/.yeetconfig (personal preferences)
           • See CONFIGURATION.md for complete reference
         """,
-        version: "1.3.0"
+        version: "1.4.0"
     )
 
     // MARK: - Input Sources
