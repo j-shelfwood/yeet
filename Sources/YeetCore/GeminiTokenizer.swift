@@ -1,6 +1,38 @@
 import Foundation
 import SentencepieceTokenizer
 
+/// Actor to manage concurrent access to the tokenizer
+/// Limits parallelism to prevent thread contention
+private actor TokenizerQueue {
+    private let maxConcurrency: Int
+    private var activeTasks = 0
+    private var waitingTasks: [CheckedContinuation<Void, Never>] = []
+
+    init(maxConcurrency: Int) {
+        self.maxConcurrency = maxConcurrency
+    }
+
+    func acquire() async {
+        if activeTasks < maxConcurrency {
+            activeTasks += 1
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            waitingTasks.append(continuation)
+        }
+        activeTasks += 1
+    }
+
+    func release() {
+        activeTasks -= 1
+        if !waitingTasks.isEmpty {
+            let continuation = waitingTasks.removeFirst()
+            continuation.resume()
+        }
+    }
+}
+
 /// Gemini-compatible token counter using SentencePiece
 ///
 /// Uses the official Gemma tokenizer model (same as Gemini) for accurate
@@ -34,7 +66,15 @@ public final class GeminiTokenizer: @unchecked Sendable {
     /// Characters per token ratio for fallback mode
     private let fallbackCharsPerToken: Double = 3.5
 
+    /// Actor to limit concurrent tokenization tasks
+    /// Prevents thread contention on the underlying C++ tokenizer
+    private let tokenizerQueue: TokenizerQueue
+
     private init() {
+        // Limit to CPU core count for optimal throughput
+        let coreCount = ProcessInfo.processInfo.activeProcessorCount
+        self.tokenizerQueue = TokenizerQueue(maxConcurrency: coreCount)
+
         // Try to load the bundled tokenizer model
         loadTokenizerModel()
     }
@@ -71,14 +111,89 @@ public final class GeminiTokenizer: @unchecked Sendable {
         isUsingFallback = true
     }
 
-    /// Count tokens for a string
+    /// Count tokens for a string using parallel processing
     ///
-    /// Uses SentencePiece if available, otherwise falls back to approximation.
+    /// Splits large text into chunks and processes them concurrently for significant
+    /// speedup on multi-core systems. For small text (<1M chars), uses direct counting.
     ///
     /// - Parameter text: Text to tokenize
     /// - Returns: Token count (exact if model loaded, approximate otherwise)
     public func count(text: String) async throws -> Int {
-        return countSync(text: text)
+        // For small/medium text, use direct counting (parallel overhead not worth it)
+        guard text.count > 1_000_000 else {
+            return countSync(text: text)
+        }
+
+        // For very large text, use parallel chunked processing
+        return try await countParallel(text: text, chunkSize: 500_000)
+    }
+
+    /// Count tokens in parallel by chunking text
+    ///
+    /// Splits text into ~100KB chunks and processes them concurrently.
+    /// Uses an actor to prevent thread contention on the tokenizer.
+    ///
+    /// - Parameters:
+    ///   - text: Text to tokenize
+    ///   - chunkSize: Target size per chunk in characters (default: 100,000)
+    /// - Returns: Total token count
+    private func countParallel(text: String, chunkSize: Int = 100_000) async throws -> Int {
+        let chunks = chunkText(text, chunkSize: chunkSize)
+
+        return try await withThrowingTaskGroup(of: Int.self) { group in
+            for chunk in chunks {
+                group.addTask {
+                    // Acquire slot before tokenizing
+                    await self.tokenizerQueue.acquire()
+                    defer { Task { await self.tokenizerQueue.release() } }
+
+                    return self.countSync(text: chunk)
+                }
+            }
+
+            // Sum all chunk token counts
+            var totalTokens = 0
+            for try await count in group {
+                totalTokens += count
+            }
+            return totalTokens
+        }
+    }
+
+    /// Split text into chunks respecting UTF-8 boundaries
+    ///
+    /// Ensures chunks are split at safe character boundaries to avoid
+    /// corrupting multi-byte UTF-8 sequences.
+    ///
+    /// - Parameters:
+    ///   - text: Text to split
+    ///   - chunkSize: Target chunk size in characters
+    /// - Returns: Array of text chunks
+    private func chunkText(_ text: String, chunkSize: Int) -> [String] {
+        guard text.count > chunkSize else {
+            return [text]
+        }
+
+        var chunks: [String] = []
+        var currentIndex = text.startIndex
+
+        while currentIndex < text.endIndex {
+            // Calculate end index for this chunk
+            let distance = text.distance(from: currentIndex, to: text.endIndex)
+            let chunkLength = min(chunkSize, distance)
+
+            guard let endIndex = text.index(currentIndex, offsetBy: chunkLength, limitedBy: text.endIndex) else {
+                // Remaining text is smaller than chunk size
+                chunks.append(String(text[currentIndex..<text.endIndex]))
+                break
+            }
+
+            // Extract chunk
+            chunks.append(String(text[currentIndex..<endIndex]))
+            currentIndex = endIndex
+        }
+
+        return chunks
     }
 
     /// Synchronous token count

@@ -179,7 +179,7 @@ extension YeetConfig {
     public static let defaultUserConfig = YeetConfig(
         defaults: DefaultsConfig(
             maxTokens: 10000,
-            maxFiles: 10000,
+            maxFiles: 100000,
             maxFileSizeMB: 100,
             maxTotalTokens: 1_000_000,
             showTree: false,

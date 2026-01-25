@@ -17,7 +17,7 @@ import Foundation
 ///     includeHistory: true,
 ///     historyCount: 10,
 ///     safetyLimits: SafetyLimits(
-///         maxFiles: 10_000,
+///         maxFiles: 100_000,
 ///         maxFileSize: 100 * 1024 * 1024,
 ///         maxTotalTokens: 1_000_000
 ///     )

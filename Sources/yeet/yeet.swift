@@ -16,7 +16,7 @@ struct Yeet: AsyncParsableCommand {
           • User config: ~/.yeetconfig (personal preferences)
           • See CONFIGURATION.md for complete reference
         """,
-        version: "1.4.0"
+        version: "1.5.0"
     )
 
     // MARK: - Input Sources
@@ -123,6 +123,12 @@ struct Yeet: AsyncParsableCommand {
     )
     var benchmark: Bool = false
 
+    @Flag(
+        name: .long,
+        help: "Print tokenizer status and exit"
+    )
+    var tokenizerStatus: Bool = false
+
     // MARK: - Advanced Options
 
     @Option(
@@ -141,9 +147,9 @@ struct Yeet: AsyncParsableCommand {
 
     @Option(
         name: .long,
-        help: "Maximum number of files to collect (default: 10000)"
+        help: "Maximum number of files to collect (default: 100000)"
     )
-    var maxFiles: Int = 10_000
+    var maxFiles: Int = 100_000
 
     @Option(
         name: .long,
@@ -160,6 +166,12 @@ struct Yeet: AsyncParsableCommand {
     // MARK: - Execution
 
     mutating func run() async throws {
+        // Handle tokenizer status flag
+        if tokenizerStatus {
+            printTokenizerStatus()
+            return
+        }
+
         // Determine final paths first
         let finalPaths: [String]
         if let filesFromPath = filesFrom {
@@ -185,7 +197,7 @@ struct Yeet: AsyncParsableCommand {
 
         // Merge CLI flags with config (CLI takes priority)
         let effectiveMaxTokens = maxTokens != 10000 ? maxTokens : (loadedConfig.defaults?.maxTokens ?? 10000)
-        let effectiveMaxFiles = maxFiles != 10_000 ? maxFiles : (loadedConfig.defaults?.maxFiles ?? 10_000)
+        let effectiveMaxFiles = maxFiles != 100_000 ? maxFiles : (loadedConfig.defaults?.maxFiles ?? 100_000)
         let effectiveMaxFileSizeMB = maxFileSizeMB != 100 ? maxFileSizeMB : (loadedConfig.defaults?.maxFileSizeMB ?? 100)
         let effectiveMaxTotalTokens = maxTotalTokens != 1_000_000 ? maxTotalTokens : (loadedConfig.defaults?.maxTotalTokens ?? 1_000_000)
         let effectiveShowTree = tree || (loadedConfig.defaults?.showTree ?? false)
@@ -258,6 +270,68 @@ struct Yeet: AsyncParsableCommand {
     }
 
     // MARK: - Helpers
+
+    private func printTokenizerStatus() {
+        let tokenizer = GeminiTokenizer.shared
+        print("=== Tokenizer Status ===")
+        print("Mode: \(tokenizer.statusDescription)")
+        print("Using fallback: \(tokenizer.isUsingFallback)")
+
+        // Test with sample text
+        let sample = "Hello, world! This is a test of the Gemini tokenizer. It should produce accurate token counts."
+        let count = tokenizer.countSync(text: sample)
+        print("\nSample text (\(sample.count) chars, \(sample.utf8.count) bytes):")
+        print("  \"\(sample)\"")
+        print("Token count: \(count)")
+        print("Ratio (bytes/token): \(String(format: "%.2f", Double(sample.utf8.count) / Double(count)))")
+
+        // Test encode if available
+        if let tokens = tokenizer.encode(text: sample) {
+            print("\nFirst 20 token IDs: \(Array(tokens.prefix(20)))")
+            print("Total tokens from encode: \(tokens.count)")
+        } else {
+            print("\nToken IDs: N/A (fallback mode - SentencePiece not loaded)")
+        }
+
+        // Check model file
+        let modelPath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".yeet/tokenizer.model").path
+        if FileManager.default.fileExists(atPath: modelPath) {
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: modelPath),
+               let size = attrs[.size] as? Int {
+                print("\nModel file: \(modelPath)")
+                print("Size: \(size) bytes (\(String(format: "%.1f", Double(size) / 1024 / 1024)) MB)")
+            }
+        } else {
+            print("\nModel file not found at: \(modelPath)")
+        }
+
+        // Test on a larger sample (Swift code)
+        let codeBlock = """
+        import Foundation
+
+        public struct Configuration {
+            let maxTokens: Int
+            let paths: [String]
+            var includePatterns: [String] = []
+
+            public init(maxTokens: Int = 10000, paths: [String] = ["."]) {
+                self.maxTokens = maxTokens
+                self.paths = paths
+            }
+
+            func validate() throws {
+                guard maxTokens > 0 else {
+                    throw ConfigError.invalidTokenLimit
+                }
+            }
+        }
+        """
+        let codeCount = tokenizer.countSync(text: codeBlock)
+        print("\nCode block test (\(codeBlock.utf8.count) bytes):")
+        print("Token count: \(codeCount)")
+        print("Ratio (bytes/token): \(String(format: "%.2f", Double(codeBlock.utf8.count) / Double(codeCount)))")
+    }
 
     private func runBenchmark(collector: ContextCollector) async throws {
         let iterations = 3
