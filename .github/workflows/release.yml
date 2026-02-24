@@ -9,64 +9,127 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build and Release
-    runs-on: macos-latest  # Use latest macOS with Swift 6.1
+  build-macos:
+    name: Build macOS binary
+    runs-on: macos-latest
 
     steps:
     - uses: actions/checkout@v4
-      with:
-        lfs: true
 
     - name: Get version
       id: get_version
       run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-    - name: Debug framework before build
-      run: |
-        echo "=== Checking source framework ==="
-        file Frameworks/TiktokenFFI.xcframework/macos-arm64_x86_64/TiktokenFFI.framework/TiktokenFFI
-        lipo -info Frameworks/TiktokenFFI.xcframework/macos-arm64_x86_64/TiktokenFFI.framework/TiktokenFFI
-
     - name: Build release binary
-      run: swift build -c release -v 2>&1 | tail -100 || true
+      run: swift build -c release
 
-    - name: Debug framework after failed build
-      if: failure()
-      run: |
-        echo "=== Checking copied framework ==="
-        find .build -name "TiktokenFFI" -type f -exec file {} \;
-        find .build -name "TiktokenFFI" -type f -exec lipo -info {} \;
+    - name: Rename binary
+      run: cp .build/release/yeet yeet-macos
 
     - name: Calculate SHA256
       id: sha256
-      run: |
-        cd .build/release
-        echo "SHA256=$(shasum -a 256 yeet | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
-        cd ../..
+      run: echo "SHA256=$(shasum -a 256 yeet-macos | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: yeet-macos
+        path: yeet-macos
+
+    outputs:
+      version: ${{ steps.get_version.outputs.VERSION }}
+      sha256: ${{ steps.sha256.outputs.SHA256 }}
+
+  build-linux:
+    name: Build Linux binary
+    runs-on: ubuntu-latest
+    container:
+      image: swift:5.10
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install system dependencies
+      run: apt-get update && apt-get install -y libicu-dev patchelf
+
+    - name: Build release binary
+      run: swift build -c release
+
+    - name: Rename binary
+      run: cp .build/release/yeet yeet-linux-x86_64
+
+    - name: Calculate SHA256
+      id: sha256
+      run: echo "SHA256=$(sha256sum yeet-linux-x86_64 | cut -d ' ' -f 1)" >> $GITHUB_OUTPUT
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: yeet-linux-x86_64
+        path: yeet-linux-x86_64
+
+    outputs:
+      sha256: ${{ steps.sha256.outputs.SHA256 }}
+
+  release:
+    name: Create Release
+    needs: [build-macos, build-linux]
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download macOS binary
+      uses: actions/download-artifact@v4
+      with:
+        name: yeet-macos
+
+    - name: Download Linux binary
+      uses: actions/download-artifact@v4
+      with:
+        name: yeet-linux-x86_64
+
+    - name: Get version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        files: .build/release/yeet
+        files: |
+          yeet-macos
+          yeet-linux-x86_64
         body: |
           ## Installation
 
-          ### Homebrew
+          ### Homebrew (macOS)
           ```bash
           brew install j-shelfwood/tap/yeet
           ```
 
-          ### Manual
+          ### Arch Linux (AUR)
           ```bash
-          curl -L https://github.com/j-shelfwood/yeet/releases/download/v${{ steps.get_version.outputs.VERSION }}/yeet -o yeet
+          yay -S yeet
+          ```
+
+          ### Linux manual
+          ```bash
+          curl -L https://github.com/j-shelfwood/yeet/releases/download/v${{ steps.get_version.outputs.VERSION }}/yeet-linux-x86_64 -o yeet
           chmod +x yeet
-          mv yeet /usr/local/bin/
+          sudo mv yeet /usr/local/bin/
+          ```
+
+          ### macOS manual
+          ```bash
+          curl -L https://github.com/j-shelfwood/yeet/releases/download/v${{ steps.get_version.outputs.VERSION }}/yeet-macos -o yeet
+          chmod +x yeet
+          sudo mv yeet /usr/local/bin/
           ```
 
           ## Checksums
 
-          SHA256: `${{ steps.sha256.outputs.SHA256 }}`
+          macOS SHA256: `${{ needs.build-macos.outputs.sha256 }}`
+          Linux SHA256: `${{ needs.build-linux.outputs.sha256 }}`
 
           ## What's Changed
 
@@ -74,48 +137,49 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Update Homebrew Formula
+  update-homebrew:
+    name: Update Homebrew Formula
+    needs: [build-macos, release]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Get version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Update Homebrew formula
       env:
         HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
       run: |
-        # Clone homebrew-tap repository
         git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/j-shelfwood/homebrew-tap.git /tmp/homebrew-tap
         cd /tmp/homebrew-tap
 
-        # Configure git
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
 
-        # Update formula
         cat > Formula/yeet.rb << 'EOF'
         class Yeet < Formula
           desc "Package your codebase for AI consumption in seconds"
           homepage "https://github.com/j-shelfwood/yeet"
-          url "https://github.com/j-shelfwood/yeet/releases/download/v${{ steps.get_version.outputs.VERSION }}/yeet"
+          url "https://github.com/j-shelfwood/yeet/releases/download/v${{ steps.get_version.outputs.VERSION }}/yeet-macos"
           version "${{ steps.get_version.outputs.VERSION }}"
-          sha256 "${{ steps.sha256.outputs.SHA256 }}"
+          sha256 "${{ needs.build-macos.outputs.sha256 }}"
           license "MIT"
 
           depends_on :macos
 
           def install
-            bin.install "yeet"
+            bin.install "yeet-macos" => "yeet"
           end
 
           test do
-            # Test basic functionality
             assert_match "yeet", shell_output("#{bin}/yeet --version")
-
-            # Test help command
             assert_match "Package source code for LLM consumption", shell_output("#{bin}/yeet --help")
-
-            # Test list-only mode (dry run)
             system "#{bin}/yeet", "--list-only"
           end
         end
         EOF
 
-        # Commit and push
         git add Formula/yeet.rb
         git commit -m "chore: Update yeet formula to v${{ steps.get_version.outputs.VERSION }}"
         git push origin main

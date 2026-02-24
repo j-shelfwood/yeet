@@ -1,0 +1,34 @@
+# Maintainer: your-name <your-email>
+pkgname=yeet
+pkgver=1.5.0
+pkgrel=1
+pkgdesc="Package your codebase for AI consumption in seconds"
+arch=('x86_64')
+url="https://github.com/j-shelfwood/yeet"
+license=('MIT')
+depends=('glibc')
+makedepends=('swift>=5.9')
+optdepends=(
+  'xclip: clipboard support (X11)'
+  'xsel: clipboard support (X11, alternative)'
+  'wl-clipboard: clipboard support (Wayland)'
+)
+source=("$pkgname-$pkgver.tar.gz::https://github.com/j-shelfwood/yeet/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "$pkgname-$pkgver"
+    swift build -c release --disable-sandbox
+}
+
+check() {
+    cd "$pkgname-$pkgver"
+    swift test --disable-sandbox || true
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    install -Dm755 ".build/release/yeet" "$pkgdir/usr/bin/yeet"
+    install -Dm644 "LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 "README.md" "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

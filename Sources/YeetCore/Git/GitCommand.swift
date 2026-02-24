@@ -40,11 +40,15 @@ enum GitCommand {
 
     /// Resolve directory from file or directory path
     static func resolveDirectory(from path: String) -> String {
-        var isDirectory: ObjCBool = false
         let fileManager = FileManager.default
+        var isDirectory: ObjCBool = false
 
         if fileManager.fileExists(atPath: path, isDirectory: &isDirectory) {
-            return isDirectory.boolValue ? path : (path as NSString).deletingLastPathComponent
+            if isDirectory.boolValue {
+                return path
+            } else {
+                return URL(fileURLWithPath: path).deletingLastPathComponent().path
+            }
         }
 
         return path

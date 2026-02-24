@@ -1,0 +1,24 @@
+# Maintainer: your-name <your-email>
+# Binary package — no compilation required. Uses prebuilt GitHub release binary.
+# Package name convention: yeet-bin
+pkgname=yeet-bin
+pkgver=1.5.0
+pkgrel=1
+pkgdesc="Package your codebase for AI consumption in seconds (prebuilt binary)"
+arch=('x86_64')
+url="https://github.com/j-shelfwood/yeet"
+license=('MIT')
+depends=('glibc')
+provides=('yeet')
+conflicts=('yeet')
+optdepends=(
+  'xclip: clipboard support (X11)'
+  'xsel: clipboard support (X11, alternative)'
+  'wl-clipboard: clipboard support (Wayland)'
+)
+source_x86_64=("yeet-linux-x86_64::https://github.com/j-shelfwood/yeet/releases/download/v$pkgver/yeet-linux-x86_64")
+sha256sums_x86_64=('SKIP')
+
+package() {
+    install -Dm755 "yeet-linux-x86_64" "$pkgdir/usr/bin/yeet"
+}

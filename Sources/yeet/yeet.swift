@@ -257,7 +257,12 @@ struct Yeet: AsyncParsableCommand {
 
             // Copy to clipboard if not list-only mode and within budget
             if !listOnly && !overBudget {
-                try result.copyToClipboard()
+                do {
+                    try result.copyToClipboard()
+                } catch YeetError.unsupportedPlatform {
+                    // No clipboard tool available — print output to stdout instead
+                    print(result.output)
+                }
             }
 
             // Always show enhanced statistics with visual elements
