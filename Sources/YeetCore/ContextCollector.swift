@@ -69,6 +69,17 @@ public class ContextCollector {
     /// - Returns: A ``CollectionResult`` containing file count, token count, and formatted output
     /// - Throws: ``YeetError`` if safety limits are exceeded or operations fail
     public func collect() async throws -> CollectionResult {
+        try await collectInternal(allowOverBudget: false)
+    }
+
+    /// Executes collection while optionally allowing total tokens to exceed the safety limit.
+    ///
+    /// - Parameter allowOverBudget: If true, returns a result even when total tokens exceed limit.
+    public func collect(allowOverBudget: Bool) async throws -> CollectionResult {
+        try await collectInternal(allowOverBudget: allowOverBudget)
+    }
+
+    private func collectInternal(allowOverBudget: Bool) async throws -> CollectionResult {
         // Step 1: Discover files (handle diff mode if enabled)
         progress("Discovering files...")
         let fileURLs: [URL]
@@ -146,7 +157,7 @@ public class ContextCollector {
         }
 
         // Step 5: Verify total tokens within safety limit
-        if totalTokens > configuration.safetyLimits.maxTotalTokens {
+        if totalTokens > configuration.safetyLimits.maxTotalTokens && !allowOverBudget {
             throw YeetError.tooManyTokens(
                 total: totalTokens,
                 limit: configuration.safetyLimits.maxTotalTokens

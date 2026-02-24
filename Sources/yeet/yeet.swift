@@ -252,10 +252,11 @@ struct Yeet: AsyncParsableCommand {
         if benchmark {
             try await runBenchmark(collector: collector)
         } else {
-            let result = try await collector.collect()
+            let result = try await collector.collect(allowOverBudget: true)
+            let overBudget = !listOnly && result.totalTokens > effectiveMaxTotalTokens
 
-            // Copy to clipboard if not list-only mode
-            if !listOnly {
+            // Copy to clipboard if not list-only mode and within budget
+            if !listOnly && !overBudget {
                 try result.copyToClipboard()
             }
 
@@ -266,6 +267,11 @@ struct Yeet: AsyncParsableCommand {
                 budget: effectiveMaxTotalTokens,
                 listOnly: listOnly
             ))
+
+            if overBudget {
+                print("⚠️  Total tokens exceed max_total_tokens; output not copied to clipboard.")
+                throw ExitCode(2)
+            }
         }
     }
 

@@ -63,7 +63,7 @@ yeet --quiet --json > context.json
 ```bash
 --max-tokens N          # Max tokens per file (default: 10000)
 --max-total-tokens N    # Max total tokens (default: 1000000)
---max-files N           # Max file count (default: 10000)
+--max-files N           # Max file count (default: 100000)
 --type PATTERN          # Filter by pattern (e.g., "*.swift")
 --include PATTERN       # Add pattern to defaults
 --exclude DIR           # Exclude directory
@@ -71,6 +71,8 @@ yeet --quiet --json > context.json
 --json                  # JSON output format
 --no-tree               # Skip directory tree
 ```
+
+When total tokens exceed `max_total_tokens`, yeet prints stats, skips clipboard copy, and exits with code 2.
 
 ## Configuration
 

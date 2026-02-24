@@ -116,6 +116,10 @@ final class IntegrationTests: XCTestCase {
                 return
             }
         }
+
+        let result = try await collector.collect(allowOverBudget: true)
+        XCTAssertGreaterThan(result.totalTokens, safetyLimits.maxTotalTokens)
+        XCTAssertEqual(result.fileCount, 10)
     }
 
     // MARK: - Directory Exclusion Tests

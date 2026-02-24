@@ -32,7 +32,7 @@ final class ConfigLoaderTests: XCTestCase {
 
         XCTAssertNotNil(config.defaults)
         XCTAssertEqual(config.defaults?.maxTokens, 10000)
-        XCTAssertEqual(config.defaults?.maxFiles, 10000)
+        XCTAssertEqual(config.defaults?.maxFiles, 100000)
         XCTAssertEqual(config.defaults?.maxFileSizeMB, 100)
         XCTAssertEqual(config.defaults?.maxTotalTokens, 1_000_000)
         XCTAssertEqual(config.defaults?.showTree, false)

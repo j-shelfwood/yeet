@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- CLI over-budget behavior now prints stats, skips clipboard copy, and exits with code 2 when total tokens exceed `max_total_tokens`.
+
 ## [1.2.1] - 2025-12-28
 
 ### Fixed

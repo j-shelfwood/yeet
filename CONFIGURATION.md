@@ -51,7 +51,7 @@ yeet --max-tokens 5000 --exclude dist
 ```toml
 [defaults]
 max_tokens = 10000              # Max tokens per file before truncation
-max_files = 10000               # Max files to collect (safety limit)
+max_files = 100000              # Max files to collect (safety limit)
 max_file_size_mb = 100          # Max file size in MB
 max_total_tokens = 1000000      # Max total tokens across all files
 show_tree = false               # Include directory tree in output
@@ -65,6 +65,8 @@ quiet = false                   # Suppress progress messages
 - `--max-total-tokens <n>`
 - `--tree` / `--no-tree`
 - `--quiet`
+
+If total tokens exceed `max_total_tokens`, yeet prints stats, skips clipboard copy, and exits with code 2.
 
 ---
 
