@@ -289,10 +289,10 @@ public struct TextFormatter {
         output += "\n"
         if listOnly {
             output += "📋 File List Preview\n"
+            output += String(repeating: "─", count: 60) + "\n\n"
         } else {
-            output += "✓ Context copied to clipboard!\n"
+            output += String(repeating: "─", count: 60) + "\n\n"
         }
-        output += String(repeating: "─", count: 60) + "\n\n"
 
         // Token budget visualization
         let percentage = Double(totalTokens) / Double(budget) * 100
@@ -306,6 +306,10 @@ public struct TextFormatter {
                         formatNumber(totalTokens),
                         formatNumber(budget))
 
+        // WinDirStat-style treemap visualization
+        output += formatTreemap(files: files, totalTokens: totalTokens, terminalWidth: 60)
+        output += "\n"
+
         // File and truncation stats
         let truncatedCount = files.filter { $0.wasTruncated }.count
         output += String(format: "Files:   %d collected", files.count)
@@ -314,18 +318,6 @@ public struct TextFormatter {
             output += String(format: " (%d truncated, %.1f%%)", truncatedCount, truncatedPercent)
         }
         output += "\n\n"
-
-        // Directory breakdown with spark bars
-        if !files.isEmpty {
-            output += formatDirectoryBreakdown(files: files, totalTokens: totalTokens)
-            output += "\n"
-        }
-
-        // Top 5 largest files
-        if !files.isEmpty {
-            output += formatTopFiles(files: files, count: 5)
-            output += "\n"
-        }
 
         // Truncation savings
         if truncatedCount > 0 {
@@ -491,5 +483,92 @@ public struct TextFormatter {
         } else {
             return String(number)
         }
+    }
+
+    /// Format WinDirStat-style proportional block treemap
+    public static func formatTreemap(files: [FileContent], totalTokens: Int, terminalWidth: Int = 80) -> String {
+        guard !files.isEmpty && totalTokens > 0 else { return "" }
+
+        var output = ""
+        output += "Token Map\n"
+        output += String(repeating: "─", count: min(terminalWidth - 1, 60)) + "\n"
+
+        // Find common path prefix
+        let commonPrefix = findCommonPathPrefix(paths: files.map { $0.path })
+
+        // Check if we have per-file token counts
+        let hasPerFileCounts = files.contains { $0.tokenCount > 0 }
+
+        // Aggregate by directory
+        var dirStats: [String: Int] = [:]
+
+        for file in files {
+            var relativePath = file.path
+            if !commonPrefix.isEmpty && file.path.hasPrefix(commonPrefix) {
+                relativePath = String(file.path.dropFirst(commonPrefix.count))
+                if relativePath.hasPrefix("/") { relativePath = String(relativePath.dropFirst()) }
+            }
+            let components = relativePath.split(separator: "/")
+            let topDir = components.count <= 1 ? "(root)" : String(components[0])
+            
+            // Use per-file token count if available, otherwise estimate from bytes
+            let fileValue: Int
+            if hasPerFileCounts {
+                fileValue = file.tokenCount
+            } else {
+                // Estimate: ~3.5 bytes per token for source code
+                fileValue = file.content.utf8.count
+            }
+            dirStats[topDir, default: 0] += fileValue
+        }
+
+        let barWidth = min(40, terminalWidth - 30)
+        let sorted = dirStats.sorted { $0.value > $1.value }
+        let top = Array(sorted.prefix(8))
+        let otherValue = sorted.dropFirst(8).reduce(0) { $0 + $1.value }
+
+        // Calculate total from directory stats for percentage calculation
+        let distributionTotal = dirStats.values.reduce(0, +)
+
+        func renderBar(_ value: Int, _ total: Int) -> String {
+            let ratio = Double(value) / Double(total)
+            let filled = Int(ratio * Double(barWidth))
+            let empty = barWidth - filled
+            return String(repeating: "█", count: filled) + String(repeating: "░", count: empty)
+        }
+
+        for (dir, value) in top {
+            let pct = Double(value) / Double(distributionTotal) * 100
+            let bar = renderBar(value, distributionTotal)
+            let label = (dir + "/").padding(toLength: 22, withPad: " ", startingAt: 0)
+            
+            // Show estimated tokens when using byte-based estimation
+            let tokenDisplay: String
+            if hasPerFileCounts {
+                tokenDisplay = formatNumber(value)
+            } else {
+                let estimatedTokens = value / 4  // ~4 bytes per token
+                tokenDisplay = "~" + formatNumber(estimatedTokens)
+            }
+            output += String(format: "│ %@ %@  %5.1f%%  %@ │\n", label, bar, pct, tokenDisplay)
+        }
+
+        if otherValue > 0 {
+            let pct = Double(otherValue) / Double(distributionTotal) * 100
+            let bar = renderBar(otherValue, distributionTotal)
+            let label = "(other)".padding(toLength: 22, withPad: " ", startingAt: 0)
+            
+            let tokenDisplay: String
+            if hasPerFileCounts {
+                tokenDisplay = formatNumber(otherValue)
+            } else {
+                let estimatedTokens = otherValue / 4
+                tokenDisplay = "~" + formatNumber(estimatedTokens)
+            }
+            output += String(format: "│ %@ %@  %5.1f%%  %@ │\n", label, bar, pct, tokenDisplay)
+        }
+
+        output += String(repeating: "─", count: min(terminalWidth - 1, 60)) + "\n"
+        return output
     }
 }

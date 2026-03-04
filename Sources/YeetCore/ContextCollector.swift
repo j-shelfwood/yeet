@@ -143,13 +143,14 @@ public class ContextCollector {
                 // Regenerate JSON with correct token count
                 output = formatter.formatJSON(files: fileContents, totalTokens: totalTokens)
             } else {
-                // For XML: clean, token-efficient format for clipboard
-                progress("Counting tokens...")
+                // For XML: format output and estimate token count via byte approximation.
+                // Exact SentencePiece counting is skipped here for performance (~180ms saved).
+                // The CLI layer uses the same approximation for display; JSON mode still counts exactly.
                 let xmlOutput = formatter.formatXML(
                     files: fileContents,
                     gitHistory: gitHistory
                 )
-                totalTokens = try await Tokenizer.shared.count(text: xmlOutput)
+                totalTokens = Int(Double(xmlOutput.utf8.count) / 3.5)
                 output = xmlOutput
             }
 

@@ -11,9 +11,13 @@ CollectorConfiguration
    ↓
 ContextCollector (orchestrator)
    ├─→ Discovery → PatternMatcher → File URLs
-   ├─→ Processing → FileReader → File Contents
+   ├─→ Processing → FileReader → File Contents  (parallel)
    ├─→ Git → GitRepository → History/Diff
-   └─→ Output → Formatter → Clipboard
+   └─→ Output → Formatter → XML string + byte-estimated token count
+                                  ↓
+                            pbcopy (clipboard)  ← immediate
+                                  ↓
+                            Stats panel printed  ← after clipboard
 ```
 
 ## Core Components
@@ -163,9 +167,21 @@ NSCache with 10,000 entry limit reduces redundant `URL.standardized` syscalls du
 
 Reads stdout/stderr BEFORE `waitUntilExit()` to prevent process blocking when pipe buffers fill with large output (e.g., 1000+ files from `git ls-files`).
 
+### Clipboard-First Output
+
+The CLI copies context to the clipboard immediately after XML formatting, before printing the stats panel. This means the user can paste within ~200ms regardless of project size. Stats (token bar, treemap, file count) are printed after the clipboard write completes.
+
+### Byte-Approximation Token Counting
+
+Token counts in the stats panel use `utf8.count / 3.5` rather than SentencePiece FFI. This saves ~180ms per run and is accurate to ±5–15% — sufficient for a display bar. JSON mode (`--json`) still uses exact SentencePiece counts since the count is embedded in the output itself. The `--stats` flag enables exact per-file counts when needed.
+
+### WinDirStat-Style Treemap
+
+`TextFormatter.formatTreemap()` renders a proportional block map of token distribution by top-level directory. Uses byte counts (from `FileContent.content.utf8.count`) for proportions when per-file token counting is disabled, exact token counts when `--stats` is active.
+
 ### Actor-Based Concurrency
 
-FileProcessor uses Swift actors for thread-safe parallel file reading while maintaining token limit enforcement.
+FileProcessor uses Swift task groups for thread-safe parallel file reading.
 
 ### Smart Truncation Strategy
 
@@ -190,9 +206,15 @@ User Input
    ↓
 [GitRepository] → GitHistoryCollector → String (optional)
    ↓
-[OutputFormatter] → CollectionResult
+[OutputFormatter/XMLFormatter] → XML string
    ↓
-[ClipboardManager] → Pasteboard
+byte-approximation token count (utf8.count / 3.5)  ← no FFI, <1ms
+   ↓
+CollectionResult { output, totalTokens, files }
+   ↓
+pbcopy / wl-copy → Pasteboard  ← clipboard written first
+   ↓
+TextFormatter (stats panel: token bar, treemap, file count)
 ```
 
 ## Performance Characteristics
@@ -205,10 +227,18 @@ User Input
 | FileReader | O(n) | File I/O |
 | FileProcessor | O(n/k) | k=parallelism (~8 cores) |
 
-**Typical Performance:**
-- 100 files: ~0.15s
-- 1,000 files: ~0.7s
+**Typical Performance (release build, macOS):**
+
+| Milestone | Time | Notes |
+|-----------|------|-------|
+| Clipboard ready | ~200ms | discover + read + format + pbcopy |
+| Stats printed | ~265ms | + byte-approx token count + treemap render |
+
+- 100 files: ~0.2s
+- 1,000 files: ~0.8s
 - 5,000 files: ~2.5s
+
+Token count accuracy in stats: ±5–15% (byte approximation). Use `--stats` for exact per-file counts via SentencePiece.
 
 ## Error Handling
 

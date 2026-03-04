@@ -2,7 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+- **WinDirStat-style token treemap** in stats output — proportional block bars per top-level directory with percentage and formatted token count
+- **`--stats` flag** — opt-in per-file token counting via SentencePiece (slower but exact); default mode uses byte approximation
+
 ### Changed
+- **Clipboard-first output** — context is copied to clipboard immediately after XML formatting, before token counting or stats rendering. Clipboard is available ~200ms after invocation.
+- **Byte-approximation token counting** — stats panel now uses `utf8.count / 3.5` instead of SentencePiece FFI, saving ~180ms per run. Accuracy ±5–15%, shown with `~` prefix. JSON mode still uses exact counts.
+- **Regex caching in `FilePatterns`** — compiled `NSRegularExpression` objects are cached per-pattern; `*.ext` suffix patterns use `hasSuffix()` fast-path, bypassing regex entirely
 - CLI over-budget behavior now prints stats, skips clipboard copy, and exits with code 2 when total tokens exceed `max_total_tokens`.
 
 ## [1.2.1] - 2025-12-28

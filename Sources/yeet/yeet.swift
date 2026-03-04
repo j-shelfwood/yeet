@@ -119,6 +119,12 @@ struct Yeet: AsyncParsableCommand {
 
     @Flag(
         name: .long,
+        help: "Enable per-file token counting statistics (slower)"
+    )
+    var stats: Bool = false
+
+    @Flag(
+        name: .long,
         help: "Run performance benchmark (3 iterations, reports timing)"
     )
     var benchmark: Bool = false
@@ -240,7 +246,7 @@ struct Yeet: AsyncParsableCommand {
             listOnly: listOnly,
             showTree: effectiveShowTree,
             quiet: effectiveQuiet,
-            enableTokenCounting: true,  // Always enable per-file token counting for statistics
+            enableTokenCounting: stats,  // Enable per-file token counting only when --stats flag is set
             rootDirectory: root,
             encodingPath: encodingPath,
             safetyLimits: safetyLimits
@@ -253,29 +259,49 @@ struct Yeet: AsyncParsableCommand {
             try await runBenchmark(collector: collector)
         } else {
             let result = try await collector.collect(allowOverBudget: true)
-            let overBudget = !listOnly && result.totalTokens > effectiveMaxTotalTokens
 
-            // Copy to clipboard if not list-only mode and within budget
-            if !listOnly && !overBudget {
+            // IMMEDIATELY copy to clipboard — before token counting
+            if !listOnly {
                 do {
                     try result.copyToClipboard()
+                    // Print instant confirmation to stderr
+                    if let data = "✓ Context copied to clipboard!\n".data(using: .utf8) {
+                        FileHandle.standardError.write(data)
+                    }
                 } catch YeetError.unsupportedPlatform {
                     // No clipboard tool available — print output to stdout instead
                     print(result.output)
                 }
             }
 
-            // Always show enhanced statistics with visual elements
-            print(TextFormatter.formatEnhancedCLIOutput(
-                files: result.files,
-                totalTokens: result.totalTokens,
-                budget: effectiveMaxTotalTokens,
-                listOnly: listOnly
-            ))
+            // Token count is already computed in ContextCollector via byte approximation.
+            // Clipboard was copied above; now show stats if not in quiet mode.
+            if !quiet && !listOnly {
+                let totalTokens = result.totalTokens
+                let overBudget = totalTokens > effectiveMaxTotalTokens
 
-            if overBudget {
-                print("⚠️  Total tokens exceed max_total_tokens; output not copied to clipboard.")
-                throw ExitCode(2)
+                // Print full stats panel
+                print(TextFormatter.formatEnhancedCLIOutput(
+                    files: result.files,
+                    totalTokens: totalTokens,
+                    budget: effectiveMaxTotalTokens,
+                    listOnly: listOnly
+                ))
+
+                if overBudget {
+                    if let data = "⚠️  Total tokens exceed max_total_tokens; clipboard content may be incomplete.\n".data(using: .utf8) {
+                        FileHandle.standardError.write(data)
+                    }
+                    throw ExitCode(2)
+                }
+            } else if listOnly {
+                let totalTokens = result.totalTokens
+                print(TextFormatter.formatEnhancedCLIOutput(
+                    files: result.files,
+                    totalTokens: totalTokens,
+                    budget: effectiveMaxTotalTokens,
+                    listOnly: listOnly
+                ))
             }
         }
     }
@@ -359,7 +385,12 @@ struct Yeet: AsyncParsableCommand {
             times.append(elapsed)
 
             fileCount = result.fileCount
-            tokenCount = result.totalTokens
+            // Count tokens if not already counted
+            if result.totalTokens == -1 {
+                tokenCount = try await Tokenizer.shared.count(text: result.output)
+            } else {
+                tokenCount = result.totalTokens
+            }
 
             print("  Iteration \(i): \(String(format: "%.3f", elapsed))s")
         }
