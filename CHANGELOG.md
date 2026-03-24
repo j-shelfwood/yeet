@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-03-24
+
+### Fixed
+- **CRITICAL**: `yeet` run from a git subdirectory scanned the entire repository instead of the current directory
+  - `GitDiscovery` was skipping the path filter entirely when `paths = ["."]`
+  - `"."` is now resolved to the actual working directory (`FileManager.currentDirectoryPath`) before filtering
+  - Running `yeet` in `project/subdir/` now only collects files under `subdir/`, not the whole repo
+  - Added 3 regression tests: `testDotPathScopedToCurrentDirectory`, `testExplicitSubdirectoryPathScopedCorrectly`, `testRootScopeReturnsAllFiles`
+
 ### Added
 - **WinDirStat-style token treemap** in stats output — proportional block bars per top-level directory with percentage and formatted token count
 - **`--stats` flag** — opt-in per-file token counting via SentencePiece (slower but exact); default mode uses byte approximation

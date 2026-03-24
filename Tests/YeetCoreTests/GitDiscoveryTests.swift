@@ -252,6 +252,110 @@ final class GitDiscoveryTests: XCTestCase {
         XCTAssertEqual(files.count, 0, "Should find no files in empty git repo")
     }
 
+    // MARK: - Subdirectory Scoping Tests (v1.5.1 bug fix)
+
+    /// Running `yeet` (i.e. paths=["."] ) from a subdirectory inside a git repo must
+    /// only return files under that subdirectory, NOT the entire repo.
+    func testDotPathScopedToCurrentDirectory() throws {
+        // Build repo:  root/subdir/file.swift  and  root/other/file.swift
+        let subDir = tempDir.appendingPathComponent("subdir")
+        let otherDir = tempDir.appendingPathComponent("other")
+        try FileManager.default.createDirectory(at: subDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: otherDir, withIntermediateDirectories: true)
+
+        let subFile = subDir.appendingPathComponent("sub.swift").standardizedFileURL
+        let otherFile = otherDir.appendingPathComponent("other.swift").standardizedFileURL
+        try "sub".write(to: subFile, atomically: true, encoding: .utf8)
+        try "other".write(to: otherFile, atomically: true, encoding: .utf8)
+
+        let gitInit = Process(); gitInit.currentDirectoryURL = tempDir
+        gitInit.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        gitInit.arguments = ["init"]; try gitInit.run(); gitInit.waitUntilExit()
+
+        let gitAdd = Process(); gitAdd.currentDirectoryURL = tempDir
+        gitAdd.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        gitAdd.arguments = ["add", "."]; try gitAdd.run(); gitAdd.waitUntilExit()
+
+        // Simulate `yeet` run from inside subdir: paths=["."], cwd=subdir
+        // FileDiscovery resolves "." against FileManager.currentDirectoryPath, so we
+        // pass the subdir as an absolute path (equivalent to cwd="subdir" + path=".").
+        let config = CollectorConfiguration(
+            paths: [subDir.path],
+            includePatterns: ["*.swift"]
+        )
+
+        let discovery = FileDiscovery(configuration: config)
+        let files = try discovery.discoverFiles()
+
+        assertContainsFile(files, subFile, "subdir/sub.swift should be included")
+        assertNotContainsFile(files, otherFile, "other/other.swift must NOT be returned when scoped to subdir")
+    }
+
+    /// Passing an explicit subdirectory path (not ".") must also be scoped correctly.
+    func testExplicitSubdirectoryPathScopedCorrectly() throws {
+        let featureDir = tempDir.appendingPathComponent("feature")
+        let sharedDir = tempDir.appendingPathComponent("shared")
+        try FileManager.default.createDirectory(at: featureDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: sharedDir, withIntermediateDirectories: true)
+
+        let featureFile = featureDir.appendingPathComponent("Feature.swift").standardizedFileURL
+        let sharedFile = sharedDir.appendingPathComponent("Shared.swift").standardizedFileURL
+        try "feature".write(to: featureFile, atomically: true, encoding: .utf8)
+        try "shared".write(to: sharedFile, atomically: true, encoding: .utf8)
+
+        let gitInit = Process(); gitInit.currentDirectoryURL = tempDir
+        gitInit.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        gitInit.arguments = ["init"]; try gitInit.run(); gitInit.waitUntilExit()
+
+        let gitAdd = Process(); gitAdd.currentDirectoryURL = tempDir
+        gitAdd.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        gitAdd.arguments = ["add", "."]; try gitAdd.run(); gitAdd.waitUntilExit()
+
+        let config = CollectorConfiguration(
+            paths: [featureDir.path],
+            includePatterns: ["*.swift"]
+        )
+
+        let discovery = FileDiscovery(configuration: config)
+        let files = try discovery.discoverFiles()
+
+        assertContainsFile(files, featureFile, "feature/Feature.swift should be included")
+        assertNotContainsFile(files, sharedFile, "shared/Shared.swift must NOT be returned")
+    }
+
+    /// Running `yeet` at the git root must still return ALL files (regression guard).
+    func testRootScopeReturnsAllFiles() throws {
+        let dirA = tempDir.appendingPathComponent("a")
+        let dirB = tempDir.appendingPathComponent("b")
+        try FileManager.default.createDirectory(at: dirA, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: dirB, withIntermediateDirectories: true)
+
+        let fileA = dirA.appendingPathComponent("a.swift").standardizedFileURL
+        let fileB = dirB.appendingPathComponent("b.swift").standardizedFileURL
+        try "a".write(to: fileA, atomically: true, encoding: .utf8)
+        try "b".write(to: fileB, atomically: true, encoding: .utf8)
+
+        let gitInit = Process(); gitInit.currentDirectoryURL = tempDir
+        gitInit.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        gitInit.arguments = ["init"]; try gitInit.run(); gitInit.waitUntilExit()
+
+        let gitAdd = Process(); gitAdd.currentDirectoryURL = tempDir
+        gitAdd.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        gitAdd.arguments = ["add", "."]; try gitAdd.run(); gitAdd.waitUntilExit()
+
+        // paths = [repoRoot] — should return everything
+        let config = CollectorConfiguration(
+            paths: [tempDir.path],
+            includePatterns: ["*.swift"]
+        )
+
+        let discovery = FileDiscovery(configuration: config)
+        let files = try discovery.discoverFiles()
+
+        assertContainsFile(files, fileA, "a/a.swift should be included when scoped to root")
+        assertContainsFile(files, fileB, "b/b.swift should be included when scoped to root")
+    }
+
     func testStaticExclusionsStillWork() throws {
         // Verify that static exclusions (node_modules, .git, etc.) still work
 

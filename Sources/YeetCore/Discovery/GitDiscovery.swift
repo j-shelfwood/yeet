@@ -32,48 +32,46 @@ public struct GitDiscovery {
             return URL(fileURLWithPath: fullPath)
         }
 
-        // If specific paths provided, filter to those (with case-insensitive comparison)
-        if configuration.paths.count > 0 && configuration.paths.first != "." {
-            let requestedPaths = configuration.paths.map { path -> String in
-                if path.hasPrefix("/") {
-                    return path
-                } else {
-                    // Construct absolute path without normalization
-                    let rootPath = gitRepo.rootPath
-                    let separator = rootPath.hasSuffix("/") ? "" : "/"
-                    return rootPath + separator + path
-                }
+        // Resolve requested paths to absolute paths.
+        // "." means the current working directory — NOT the git root.
+        let cwd = FileManager.default.currentDirectoryPath
+        let requestedPaths = configuration.paths.map { path -> String in
+            if path.hasPrefix("/") {
+                return path
+            } else if path == "." {
+                return cwd
+            } else {
+                // Relative path: resolve against cwd
+                return (cwd as NSString).appendingPathComponent(path)
             }
-
-            // FAST PATH: Check if requested path is the repository root
-            // If so, skip filtering entirely (common case: yeet ~/path/to/repo)
-            let rootPath = gitRepo.rootPath
-
-            let isRequestingRoot = requestedPaths.contains { requested in
-                // Simple string prefix check (case-insensitive)
-                rootPath.range(
-                    of: requested,
-                    options: [.anchored, .caseInsensitive]
-                ) != nil
-            }
-
-            if !isRequestingRoot {
-                // Need to filter - only keep files matching requested paths
-                // Use string comparison instead of PathNormalizer to avoid syscalls
-                allFiles = allFiles.filter { url in
-                    let filePath = url.path
-
-                    // Check if file path starts with any requested prefix
-                    return requestedPaths.contains { prefix in
-                        filePath.range(
-                            of: prefix,
-                            options: [.anchored, .caseInsensitive]
-                        ) != nil
-                    }
-                }
-            }
-            // else: requesting root, keep all files (no filtering needed)
         }
+
+        // FAST PATH: Check if requested path is the repository root
+        // If so, skip filtering entirely (common case: yeet ~/path/to/repo)
+        let rootPath = gitRepo.rootPath
+
+        let isRequestingRoot = requestedPaths.contains { requested in
+            // Simple string prefix check (case-insensitive)
+            rootPath.range(
+                of: requested,
+                options: [.anchored, .caseInsensitive]
+            ) != nil
+        }
+
+        if !isRequestingRoot {
+            // Need to filter - only keep files under requested paths
+            allFiles = allFiles.filter { url in
+                let filePath = url.path
+
+                return requestedPaths.contains { prefix in
+                    filePath.range(
+                        of: prefix,
+                        options: [.anchored, .caseInsensitive]
+                    ) != nil
+                }
+            }
+        }
+        // else: requesting root, keep all files (no filtering needed)
 
         // Remove duplicates and sort
         let uniqueFiles = Array(Set(allFiles)).sorted { $0.path < $1.path }
