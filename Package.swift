@@ -35,13 +35,17 @@ let package = Package(
         ),
 
         // Library target (contains business logic)
-        // Uses SentencePiece for Gemini-compatible tokenization
+        // Uses SentencePiece for Gemini-compatible tokenization on macOS only
         // Run scripts/download-tokenizer.sh to enable exact token counting
         .target(
             name: "YeetCore",
             dependencies: [
                 .product(name: "TOMLKit", package: "TOMLKit"),
-                .product(name: "SentencepieceTokenizer", package: "swift-sentencepiece"),
+                .product(
+                    name: "SentencepieceTokenizer",
+                    package: "swift-sentencepiece",
+                    condition: .when(platforms: [.macOS])
+                ),
             ],
             exclude: ["Resources/README.md"]
         ),

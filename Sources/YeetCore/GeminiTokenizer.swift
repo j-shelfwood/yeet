@@ -1,5 +1,7 @@
 import Foundation
+#if os(macOS)
 import SentencepieceTokenizer
+#endif
 
 /// Actor to manage concurrent access to the tokenizer
 /// Limits parallelism to prevent thread contention
@@ -57,8 +59,10 @@ private actor TokenizerQueue {
 public final class GeminiTokenizer: @unchecked Sendable {
     public static let shared = GeminiTokenizer()
 
-    /// The SentencePiece tokenizer (nil if model not available)
+    /// The SentencePiece tokenizer (nil if model not available or on non-macOS)
+    #if os(macOS)
     private var sentencepiece: SentencepieceTokenizer?
+    #endif
 
     /// Whether we're using the actual tokenizer or fallback
     public private(set) var isUsingFallback: Bool = true
@@ -81,6 +85,7 @@ public final class GeminiTokenizer: @unchecked Sendable {
 
     /// Attempt to load the SentencePiece tokenizer model
     private func loadTokenizerModel() {
+        #if os(macOS)
         // Search paths for tokenizer.model (in order of preference)
         let searchPaths = [
             // User's yeet config directory
@@ -106,8 +111,9 @@ public final class GeminiTokenizer: @unchecked Sendable {
                 }
             }
         }
+        #endif
 
-        // Fallback mode - use approximation
+        // Fallback mode - use approximation (always on Linux, optional on macOS)
         isUsingFallback = true
     }
 
@@ -203,6 +209,7 @@ public final class GeminiTokenizer: @unchecked Sendable {
     public func countSync(text: String) -> Int {
         guard !text.isEmpty else { return 0 }
 
+        #if os(macOS)
         if let tokenizer = sentencepiece {
             // Use actual SentencePiece tokenization
             do {
@@ -213,37 +220,46 @@ public final class GeminiTokenizer: @unchecked Sendable {
                 let byteCount = text.utf8.count
                 return Int(ceil(Double(byteCount) / fallbackCharsPerToken))
             }
-        } else {
-            // Fallback to character-based approximation
-            let byteCount = text.utf8.count
-            return Int(ceil(Double(byteCount) / fallbackCharsPerToken))
         }
+        #endif
+
+        // Fallback to byte-based approximation
+        let byteCount = text.utf8.count
+        return Int(ceil(Double(byteCount) / fallbackCharsPerToken))
     }
 
-    /// Encode text to token IDs (only available with SentencePiece model)
+    /// Encode text to token IDs (only available with SentencePiece model on macOS)
     ///
     /// - Parameter text: Text to encode
     /// - Returns: Array of token IDs, or nil if using fallback mode
     public func encode(text: String) -> [Int]? {
+        #if os(macOS)
         guard let tokenizer = sentencepiece else { return nil }
         do {
             return try tokenizer.encode(text).map { Int($0) }
         } catch {
             return nil
         }
+        #else
+        return nil
+        #endif
     }
 
-    /// Decode token IDs to text (only available with SentencePiece model)
+    /// Decode token IDs to text (only available with SentencePiece model on macOS)
     ///
     /// - Parameter tokens: Array of token IDs
     /// - Returns: Decoded text, or nil if using fallback mode
     public func decode(tokens: [Int]) -> String? {
+        #if os(macOS)
         guard let tokenizer = sentencepiece else { return nil }
         do {
             return try tokenizer.decode(tokens)
         } catch {
             return nil
         }
+        #else
+        return nil
+        #endif
     }
 
     /// Get tokenizer status for display
